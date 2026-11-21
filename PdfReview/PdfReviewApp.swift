@@ -19,24 +19,17 @@ struct PdfReviewApp: App {
 
 #if PROBE_MINIMAL
     // ── 诊断用最小模式 ──────────────────────────────────────────────
-    // 编译时加 -DPROBE_MINIMAL 会走这一支：完全没有 SwiftData 容器、
-    // 没有 App Group、没有启动维护、没有业务视图，只有一个 Text。
+    // 编译时加 -DPROBE_MINIMAL 会走这一支。
     //
-    // 它的唯一用途是把问题切开：
-    //   · 若最小版能打开 → 问题在我们自己的初始化代码里
-    //   · 若最小版也打不开 → 问题在签名/安装环节，跟代码无关
+    // 第一版这里只有一个 Text，真机验证结果：**能正常打开**。由此确认签名和
+    // 安装环节没有问题，闪退出在 App 自己的初始化代码里。
     //
-    // 之所以要这个开关：真机「一点就闪退」且启动日志空白，说明进程在
-    // 执行任何一行代码之前就被终止了。继续在完整版上猜没有意义。
+    // 第二版改成 ProbeRootView：按顺序执行 7 个可疑动作，每步之间停一下，
+    // 并且**在执行前**先把「正在执行第 N 步」画到屏幕上。真机崩溃一闪而过
+    // 拿不到日志，屏幕上留下的最后一句话就是崩溃位置。
     var body: some Scene {
         WindowGroup {
-            VStack(spacing: 12) {
-                Text("PDF 复习")
-                    .font(.title2)
-                Text("最小诊断模式")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+            ProbeRootView()
         }
     }
 

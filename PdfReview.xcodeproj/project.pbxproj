@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		BEBB0981131B68C7B66DB120 /* PdfReviewApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3D94DA8365BC02F5A457E6 /* PdfReviewApp.swift */; };
+		A9E78F0F140032DB1A74334F /* ProbeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ED27F79ABD5F355007CA463 /* ProbeView.swift */; };
 		3C466ACB3914AB0973EA1D2F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7103F12E52D4F14B11513A34 /* RootView.swift */; };
 		278187D439886F1A52849CB0 /* CardEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EFBC52D403CAEAE684EE7BC /* CardEditorView.swift */; };
 		BDC0FB86671386A237EA492C /* CardFaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F566B9C9AF79B60DAC2E5E7 /* CardFaceView.swift */; };
@@ -82,6 +83,7 @@
 
 /* Begin PBXFileReference section */
 		CF3D94DA8365BC02F5A457E6 /* PdfReviewApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PdfReviewApp.swift"; sourceTree = "<group>"; };
+		8ED27F79ABD5F355007CA463 /* ProbeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProbeView.swift"; sourceTree = "<group>"; };
 		AAE48748DF0CB279500B65C3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
 		4783B93582633D7FBC3F1F6D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 		CF04ED985E499247C5B8CB7D /* PdfReview.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "PdfReview.entitlements"; sourceTree = "<group>"; };
@@ -251,6 +253,7 @@
 				854C5A89AB5C4070AF9F7070 /* Resources */,
 				E37B2F12C7B10EFE684DBD0D /* Views */,
 				CF3D94DA8365BC02F5A457E6,
+				8ED27F79ABD5F355007CA463,
 				7103F12E52D4F14B11513A34,
 			);
 			name = "PdfReview";
@@ -478,6 +481,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BEBB0981131B68C7B66DB120 /* PdfReviewApp.swift in Sources */,
+				A9E78F0F140032DB1A74334F /* ProbeView.swift in Sources */,
 				3C466ACB3914AB0973EA1D2F /* RootView.swift in Sources */,
 				278187D439886F1A52849CB0 /* CardEditorView.swift in Sources */,
 				BDC0FB86671386A237EA492C /* CardFaceView.swift in Sources */,
