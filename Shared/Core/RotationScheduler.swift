@@ -135,7 +135,6 @@ enum RotationScheduler {
 
     /// 距当前槽位结束还剩多少秒（用于小组件倒计时）。
     static func secondsRemaining(at date: Date, cache: RotationCache) -> TimeInterval {
-        let interval = intervalSeconds(cache)
         let index = slotIndex(at: date, cache: cache)
         let end = slotStart(index: index + 1, cache: cache)
         return max(0, end.timeIntervalSince(date))
