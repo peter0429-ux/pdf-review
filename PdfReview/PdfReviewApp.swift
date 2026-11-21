@@ -1,4 +1,4 @@
-﻿//
+//
 //  PdfReviewApp.swift
 //  PdfReview
 //
@@ -23,6 +23,15 @@ struct PdfReviewApp: App {
     @StateObject private var settings = AppSettings.shared
 
     @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        // 最早的一行日志。App 若在构造 CardStore 时崩溃，下面 CardStore 里
+        // 那句「启动：」不会出现，据此就能判断崩在更早的位置。
+        LaunchLog.note("=== PdfReview 启动 ===")
+        LaunchLog.note("版本 \(Bundle.main.shortVersion)（build \(Bundle.main.buildNumber)）")
+        LaunchLog.note("系统 \(ProcessInfo.processInfo.operatingSystemVersionString)")
+        LaunchLog.note("日志位置 \(LaunchLog.currentFileURL?.path ?? "未知")")
+    }
 
     var body: some Scene {
         WindowGroup {

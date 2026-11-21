@@ -124,6 +124,7 @@ UTType UIDocumentPickerViewController UIActivityItemSource
 FileDocument ReferenceFileDocument ShareLink Transferable
 AnyPublisher PassthroughSubject CurrentValueSubject ObservableObjectPublisher
 AnyCancellable
+FileHandle InputStream OutputStream FileWrapper UIPasteboard
 """.split())
 
 

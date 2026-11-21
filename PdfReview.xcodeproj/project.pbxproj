@@ -24,6 +24,7 @@
 		59662A7F00F62FCE1AD25B35 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CC125324B34F084EA5C5EBB /* HistoryView.swift */; };
 		11A65F8BFEF9D750D4340CEC /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11DB1112D888C11454EBA21D /* ImportView.swift */; };
 		9DAB1F4CAB22322796EC4926 /* ImportingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2065A8654491136DC2D8908A /* ImportingView.swift */; };
+		4926F930C62593CD6F5FB23E /* LaunchLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 647F83DC66A4CD4C2725CE3F /* LaunchLogView.swift */; };
 		1E86FF829F302771C3589383 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC86B41D54CC155916279D25 /* OnboardingView.swift */; };
 		1AFF7EE21AD902F0CF6FFAE4 /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C914E81477CCCEA3BB9868FA /* ReviewView.swift */; };
 		3341A53232B1F13DF35AB7FF /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E7650091E8C853A22CB10CC /* SettingsView.swift */; };
@@ -38,6 +39,7 @@
 		611D3E576BAE5825BB2C2588 /* AnalysisImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F3BB28EBCFD69B94B96B8DC /* AnalysisImporter.swift */; };
 		94A54AE0B4BD17F248402FB6 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D67E7B5C9EE37A06BC20D3F9 /* AppSettings.swift */; };
 		BFBE955B95F16319DDF6F434 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CF0C695C2870FED41C46DD3 /* KeychainStore.swift */; };
+		21057833B80FE211384B70CE /* LaunchLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05DAA0FD4CC9B40751BFAD35 /* LaunchLog.swift */; };
 		511E18AB707AE6AA63BF8BB2 /* PDFTextExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F43A08E3FA15B9DFCA3F436 /* PDFTextExtractor.swift */; };
 		47D951E6B21A79341A00B0FC /* CardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 287EE3B76BAC573146FC7BA1 /* CardStore.swift */; };
 		C2C64862E2FC9CF80A72A96E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAE48748DF0CB279500B65C3 /* Assets.xcassets */; };
@@ -99,6 +101,7 @@
 		3CC125324B34F084EA5C5EBB /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HistoryView.swift"; sourceTree = "<group>"; };
 		11DB1112D888C11454EBA21D /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportView.swift"; sourceTree = "<group>"; };
 		2065A8654491136DC2D8908A /* ImportingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportingView.swift"; sourceTree = "<group>"; };
+		647F83DC66A4CD4C2725CE3F /* LaunchLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LaunchLogView.swift"; sourceTree = "<group>"; };
 		BC86B41D54CC155916279D25 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OnboardingView.swift"; sourceTree = "<group>"; };
 		C914E81477CCCEA3BB9868FA /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReviewView.swift"; sourceTree = "<group>"; };
 		9E7650091E8C853A22CB10CC /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsView.swift"; sourceTree = "<group>"; };
@@ -122,6 +125,7 @@
 		1F3BB28EBCFD69B94B96B8DC /* AnalysisImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AnalysisImporter.swift"; sourceTree = "<group>"; };
 		D67E7B5C9EE37A06BC20D3F9 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppSettings.swift"; sourceTree = "<group>"; };
 		2CF0C695C2870FED41C46DD3 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeychainStore.swift"; sourceTree = "<group>"; };
+		05DAA0FD4CC9B40751BFAD35 /* LaunchLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LaunchLog.swift"; sourceTree = "<group>"; };
 		5F43A08E3FA15B9DFCA3F436 /* PDFTextExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PDFTextExtractor.swift"; sourceTree = "<group>"; };
 		287EE3B76BAC573146FC7BA1 /* CardStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CardStore.swift"; sourceTree = "<group>"; };
 		4B54215B77C3061B2A480965 /* architecture.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "architecture.md"; sourceTree = "<group>"; };
@@ -222,6 +226,7 @@
 				1F3BB28EBCFD69B94B96B8DC,
 				D67E7B5C9EE37A06BC20D3F9,
 				2CF0C695C2870FED41C46DD3,
+				05DAA0FD4CC9B40751BFAD35,
 				5F43A08E3FA15B9DFCA3F436,
 			);
 			name = "Service";
@@ -269,6 +274,7 @@
 				3CC125324B34F084EA5C5EBB,
 				11DB1112D888C11454EBA21D,
 				2065A8654491136DC2D8908A,
+				647F83DC66A4CD4C2725CE3F,
 				BC86B41D54CC155916279D25,
 				C914E81477CCCEA3BB9868FA,
 				9E7650091E8C853A22CB10CC,
@@ -482,6 +488,7 @@
 				59662A7F00F62FCE1AD25B35 /* HistoryView.swift in Sources */,
 				11A65F8BFEF9D750D4340CEC /* ImportView.swift in Sources */,
 				9DAB1F4CAB22322796EC4926 /* ImportingView.swift in Sources */,
+				4926F930C62593CD6F5FB23E /* LaunchLogView.swift in Sources */,
 				1E86FF829F302771C3589383 /* OnboardingView.swift in Sources */,
 				1AFF7EE21AD902F0CF6FFAE4 /* ReviewView.swift in Sources */,
 				3341A53232B1F13DF35AB7FF /* SettingsView.swift in Sources */,
@@ -496,6 +503,7 @@
 				611D3E576BAE5825BB2C2588 /* AnalysisImporter.swift in Sources */,
 				94A54AE0B4BD17F248402FB6 /* AppSettings.swift in Sources */,
 				BFBE955B95F16319DDF6F434 /* KeychainStore.swift in Sources */,
+				21057833B80FE211384B70CE /* LaunchLog.swift in Sources */,
 				511E18AB707AE6AA63BF8BB2 /* PDFTextExtractor.swift in Sources */,
 				47D951E6B21A79341A00B0FC /* CardStore.swift in Sources */,
 			);

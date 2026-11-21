@@ -46,6 +46,8 @@ final class CardStore: ObservableObject {
             CardDisplayRecord.self
         ])
 
+        LaunchLog.note("启动：AppGroup.isContainerAvailable = \(AppGroup.isContainerAvailable)")
+
         // 三级降级，目标是「无论签名环境如何，App 都能启动」：
         //  1. App Group 容器可用 → 用共享容器，小组件能读到同一份数据（正式形态）
         //  2. 容器不可用（典型场景：用免费 Apple ID 侧载，provisioning profile
@@ -61,9 +63,11 @@ final class CardStore: ObservableObject {
                     groupContainer: .identifier(AppGroup.identifier)
                 )
                 container = try ModelContainer(for: schema, configurations: [configuration])
+                LaunchLog.note("容器：App Group 共享容器（小组件可读）")
                 return
             } catch {
                 lastError = "共享数据容器创建失败，已退回本地存储：\(error.localizedDescription)"
+                LaunchLog.note("容器：共享容器失败 → \(error.localizedDescription)")
             }
         }
 
@@ -74,9 +78,11 @@ final class CardStore: ObservableObject {
                 allowsSave: true
             )
             container = try ModelContainer(for: schema, configurations: [configuration])
+            LaunchLog.note("容器：本地持久化（小组件读不到，属侧载降级）")
             return
         } catch {
             lastError = "本地数据容器创建失败，已切换到临时存储：\(error.localizedDescription)"
+            LaunchLog.note("容器：本地也失败 → \(error.localizedDescription)")
         }
 
         let configuration = ModelConfiguration(
@@ -86,6 +92,7 @@ final class CardStore: ObservableObject {
         )
         // 内存容器在正常情况下不会失败；若仍失败则问题严重到无法运行。
         container = try! ModelContainer(for: schema, configurations: [configuration])
+        LaunchLog.note("容器：内存模式（数据不持久化）")
     }
 
     // MARK: 查询

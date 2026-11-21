@@ -155,6 +155,9 @@ struct SettingsView: View {
             NavigationLink("导出与分享") {
                 ExportListView()
             }
+            NavigationLink("启动日志") {
+                LaunchLogView()
+            }
         } header: {
             Text("数据")
         }
@@ -170,8 +173,16 @@ struct SettingsView: View {
             LabeledContent("分析文件格式") {
                 Text("pdfreview.json v1.0")
             }
+            LabeledContent("数据存储") {
+                Text(AppGroup.isContainerAvailable ? "共享容器（小组件可读）" : "App 本地（小组件读不到）")
+                    .font(.footnote)
+            }
         } header: {
             Text("关于")
+        } footer: {
+            Text(AppGroup.isContainerAvailable
+                 ? "App 与小组件通过 App Group 共享数据，桌面上的卡片会跟着这里的数据变化。"
+                 : "当前签名方式没有 App Groups 能力（侧载时常见），数据只存在 App 自己的沙盒里。App 里的功能全部可用，但桌面小组件读不到卡片。")
         }
     }
 
