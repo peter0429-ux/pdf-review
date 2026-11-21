@@ -149,7 +149,9 @@ struct CardEditorView: View {
             Spacer()
             Text("\(text.count) / \(limit)")
                 .font(.caption2)
-                .foregroundStyle(text.count > limit ? .red : .tertiary)
+                // 超限标红；未超限时 tertiary 是 ShapeStyle 修饰符，
+                // 不能放进三目运算符与 .red 比较（类型不同），改用具体色值
+                .foregroundStyle(text.count > limit ? Color.red : Color.secondary)
                 .monospacedDigit()
         }
     }
