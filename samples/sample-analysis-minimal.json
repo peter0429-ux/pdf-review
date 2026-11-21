@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-11-21T10:00:00+08:00",
+  "source": {
+    "fileName": "最小示例.pdf",
+    "pageCount": 3
+  },
+  "deck": {
+    "title": "最小可用示例"
+  },
+  "cards": [
+    {
+      "question": "这份文件最少必须包含哪些字段？",
+      "answer": "顶层需要 schemaVersion、generatedAt、source、deck、cards；每张卡至少要有 question 与 answer。其余字段都是可选的。"
+    },
+    {
+      "question": "source 里 pageCount 可以写 0 吗？",
+      "answer": "可以。pageCount 为 0 表示页数未知或来源不是 PDF，此时卡片不要填 sourcePage。"
+    },
+    {
+      "question": "difficulty 不写会怎样？",
+      "answer": "会被当作默认值 3。importance 同理，缺省也是 3。"
+    }
+  ]
+}

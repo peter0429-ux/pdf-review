@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "1.0",
+  "generator": "PdfReview/1.0",
+  "generatedAt": "2026-11-21T10:00:00+08:00",
+  "source": {
+    "fileName": "iOS内存管理.pdf",
+    "pageCount": 12,
+    "sha256": "3f786850e387550fdab836ed7e6dc881de23001b2b1a0d2c1b1a1d0b6a8f4c21"
+  },
+  "deck": {
+    "title": "iOS 内存管理",
+    "summary": "覆盖 ARC 引用计数、循环引用、weak/unowned 选择、autoreleasepool 与常见泄漏排查。",
+    "language": "zh-Hans"
+  },
+  "cards": [
+    {
+      "question": "ARC 在编译期做了什么，运行期又由谁负责释放对象？",
+      "answer": "ARC 是编译器特性：编译期在合适位置插入 retain/release/autorelease 调用，运行期由这些调用维护引用计数，计数归零时对象调用 deinit 并释放内存。ARC 不改变引用计数的语义，只是免去手写。",
+      "detail": "可在 Build Settings 的 Objective-C Automatic Reference Counting 确认开关状态；Swift 没有 non-ARC 模式。",
+      "tags": ["ARC", "引用计数", "基础"],
+      "sourcePage": 1,
+      "difficulty": 2,
+      "importance": 5
+    },
+    {
+      "question": "强引用循环是怎么产生的？给出一个典型例子。",
+      "answer": "两个对象互相持有强引用，各自引用计数都不会归零。典型例子：父子关系里父对象强引用子对象，子对象又用强引用指回父对象；或者闭包捕获了持有该闭包的对象（self 强捕获）。",
+      "detail": "self.handler = { self.doSomething() } 会让 self 与闭包互相持有。",
+      "tags": ["循环引用", "内存泄漏"],
+      "sourcePage": 3,
+      "difficulty": 3,
+      "importance": 5
+    },
+    {
+      "question": "weak 与 unowned 的区别是什么，什么时候该用哪个？",
+      "answer": "weak 不增加引用计数，被引用对象释放后自动置为 nil，因此必须是可选类型；unowned 也不增加引用计数，但对象释放后不会置 nil，访问已释放的 unowned 引用会崩溃。生命周期短于持有者、可能为空的用 weak；生命周期一定不短于持有者的用 unowned。",
+      "detail": "delegate 通常用 weak；同一聚合体内父对子的反向引用若确定不会被单独释放，可用 unowned。",
+      "tags": ["weak", "unowned", "引用语义"],
+      "sourcePage": 4,
+      "difficulty": 3,
+      "importance": 5
+    },
+    {
+      "question": "闭包捕获列表中 [weak self] 与 [unowned self] 的写法与风险分别是什么？",
+      "answer": "[weak self] 需要在闭包内 if let self 或 self?. 解包，安全但多一层可选判断；[unowned self] 可直接用 self，但闭包执行时若 self 已释放会崩溃。异步、长生命周期或可能悬空的闭包用 [weak self]。",
+      "detail": "[weak self] in guard let self else { return } 是常见写法（Swift 5.7+ 可省略 self）。",
+      "tags": ["闭包", "weak", "捕获列表"],
+      "sourcePage": 5,
+      "difficulty": 3,
+      "importance": 4
+    },
+    {
+      "question": "autoreleasepool 的作用是什么，什么场景下需要手写？",
+      "answer": "autoreleasepool 把 autorelease 对象延迟到池排空时释放，避免临时对象堆积。主线程每个 runloop 迭代自动有池；在循环里大量创建临时对象、或自己创建的线程里，应显式写 autoreleasepool { } 让每轮及时回收。",
+      "detail": "自己创建的 Thread/OperationQueue 任务不会自动建池，需要手动包一层。",
+      "tags": ["autoreleasepool", "生命周期"],
+      "sourcePage": 6,
+      "difficulty": 4,
+      "importance": 3
+    },
+    {
+      "question": "值类型与引用类型在内存上的差别是什么？String 是值类型，为什么改它不一定复制？",
+      "answer": "值类型（struct/enum）赋值时语义上复制，通常分配在栈上或内联；引用类型（class）赋值只复制指针，实例在堆上。Swift 的 String、Array 用写时复制（COW）：多个变量共享同一份存储，直到某一方要修改时才真正复制。",
+      "detail": "COW 靠 isKnownUniquelyReferenced 判断存储是否唯一；自定义 COW 结构体要用这个函数。",
+      "tags": ["值类型", "写时复制", "内存布局"],
+      "sourcePage": 7,
+      "difficulty": 4,
+      "importance": 3
+    },
+    {
+      "question": "收到内存警告时应该做什么？memoryWarning 与 didReceiveMemoryWarning 的区别？",
+      "answer": "内存警告到来时应释放可重建的缓存：清空图片缓存、丢弃可重算的数据、暂停后台任务。UIKit 会调用 UIViewController 的 didReceiveMemoryWarning()（iOS 6 起不再自动 purge view）；SwiftUI 里监听 UIApplication.didReceiveMemoryWarningNotification 或使用 onReceive。崩溃风险高时应降低常驻数据量。",
+      "detail": "不要把清理逻辑写成阻塞主线程的大循环；清理完最好留出可重建入口。",
+      "tags": ["内存警告", "UIKit", "SwiftUI"],
+      "sourcePage": 9,
+      "difficulty": 3,
+      "importance": 4
+    },
+    {
+      "question": "用 Instruments 定位内存泄漏的标准流程是什么？",
+      "answer": "用 Debug Memory Graph 先看对象图找可疑强引用环；再用 Leaks 模板跑一遍确认泄漏类型；用 Allocations 观察增长曲线，配合 Generation Analysis 定位增长点；必要时用 VM Tracker 区分匿名内存与脏页。定位后回到代码修正持有关系，再复测确认泄漏消失。",
+      "detail": "Memory Graph 里紫色叹号表示被泄漏对象，右侧可看完整的引用链。",
+      "tags": ["Instruments", "排查", "工具"],
+      "sourcePage": 11,
+      "difficulty": 4,
+      "importance": 4
+    }
+  ]
+}

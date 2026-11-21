@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pdfreview.local/schema/analysis.v1.schema.json",
+  "title": "PdfReview 分析文档（v1）",
+  "description": "PdfReview 的离线导入格式。一个 .pdfreview.json 文件描述一个牌组及其若干复习卡片，与 App 内 AI 分析产出的结构完全一致，两者可互换、可混合使用。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "source",
+    "deck",
+    "cards"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0",
+      "description": "格式版本。当前唯一合法值是 \"1.0\"；App 的导入器做精确比对，其他值（包括 1.1）一律提示版本不受支持。"
+    },
+    "generator": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "可选。生成工具标识，便于排查来源，例如 \"PdfReview/1.0\"、\"manual\"、\"gpt-4o-mini\"。不参与校验。"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$",
+      "description": "生成时间，ISO 8601 且必须带时区，例如 \"2026-11-21T10:00:00+08:00\"。缺失时区会导致解析失败。"
+    },
+    "source": {
+      "type": "object",
+      "description": "来源文件信息，用于在 App 里展示「这份卡片来自哪个文件」并做去重。",
+      "additionalProperties": false,
+      "required": [
+        "fileName",
+        "pageCount"
+      ],
+      "properties": {
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "源文件名，不含任何路径分隔符，例如 \"iOS内存管理.pdf\"。"
+        },
+        "pageCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000,
+          "description": "源文件页数。0 表示未知或非 PDF 来源；此时卡片不应填 sourcePage。"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "description": "可选。源文件的 SHA-256 十六进制摘要，64 个字符，建议小写，用于去重与来源校验。"
+        }
+      }
+    },
+    "deck": {
+      "type": "object",
+      "description": "牌组元信息，对应 App 里的 ReviewDeck。",
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "牌组标题，显示在列表与小组件上，例如 \"iOS 内存管理\"。"
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "可选。牌组摘要，一两句话说明本组卡片的覆盖范围。"
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$",
+          "description": "可选。卡片主语言的 BCP 47 片段，例如 \"zh-Hans\"、\"en\"、\"ja\"。仅作提示，不触发翻译。"
+        }
+      }
+    },
+    "cards": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/card"
+      },
+      "description": "卡片数组。至少 1 张，最多 500 张；超过 500 张请拆成多个文件分牌组导入。"
+    }
+  },
+  "$defs": {
+    "card": {
+      "type": "object",
+      "description": "一张复习卡片，对应 App 里的 ReviewCard。id、isFavorite、createdAt 由 App 在导入时生成，不写进文件。",
+      "additionalProperties": false,
+      "required": [
+        "question",
+        "answer"
+      ],
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "问答正面（问题）。必填，1…500 字。"
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "问答背面（答案）。必填，1…2000 字。"
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "可选。补充说明、示例代码或延伸阅读，最长 2000 字；超出会被 App 的校验器拒绝。"
+        },
+        "tags": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "description": "可选。标签数组，最多 8 个，每个 1…32 字且不重复；缺省视为空数组。"
+        },
+        "sourcePage": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "可选。该卡片对应源 PDF 的页码，从 1 开始；不是 PDF 来源时省略。"
+        },
+        "difficulty": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "default": 3,
+          "description": "可选。难度 1…5，缺省 3；数值越大越难。"
+        },
+        "importance": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "default": 3,
+          "description": "可选。重要度 1…5，缺省 3；数值越大越常出现。"
+        }
+      }
+    }
+  }
+}
