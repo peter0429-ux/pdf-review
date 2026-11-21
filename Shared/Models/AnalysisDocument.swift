@@ -291,6 +291,7 @@ extension AnalysisDocument {
     /// 粗判这份字节像不像 JSON：跳过 UTF-8 BOM 与前导空白，看第一个字符是不是 `{` 或 `[`。
     /// 只是为了让报错更准确，真正的结构校验仍然交给 `decode` 与 `AnalysisValidator`。
     static func looksLikeJSON(_ data: Data) -> Bool {
+        // Data 的 SubSequence 就是 Data，dropFirst 后可以继续赋值。
         var bytes = data
         if bytes.starts(with: [0xEF, 0xBB, 0xBF]) {
             bytes = bytes.dropFirst(3)
@@ -299,7 +300,7 @@ extension AnalysisDocument {
             switch byte {
             case 0x20, 0x09, 0x0A, 0x0D:  // 空格、制表、换行、回车
                 continue
-            case UInt8(ascii: "{"), UInt8(ascii: "["):
+            case 0x7B, 0x5B:              // '{' 与 '['
                 return true
             default:
                 return false
