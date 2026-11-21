@@ -35,7 +35,9 @@ jobs:
   # ------------------------------------------------------------------
   xcode-build:
     needs: static-checks
-    runs-on: macos-14
+    # macos-14 已被 GitHub 下线（"configuration not supported"），用 macos-15
+    # macos-15 自带 Xcode 16.x，可编译 deployment target iOS 17.0 的工程
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
