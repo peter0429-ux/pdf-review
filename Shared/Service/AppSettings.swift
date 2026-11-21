@@ -104,7 +104,7 @@ final class AppSettings: ObservableObject {
             if trimmed.isEmpty {
                 KeychainStore.remove(KeychainStore.Keys.apiKey)
             } else {
-                try? KeychainStore.set(trimmed, forKey: KeychainStore.Keys.apiKey)
+                try? KeychainStore.set(trimmed, for: KeychainStore.Keys.apiKey)
             }
             // 触发 UI 刷新
             objectWillChange.send()
