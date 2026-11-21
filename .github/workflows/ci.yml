@@ -63,13 +63,14 @@ jobs:
           # 用 -target 而不是 -scheme：scheme 需要 xcshareddata 里的共享
           # scheme 文件，本工程是脚本生成的，没有它。-target 直接命中 target。
           # destination 用 generic：不依赖 runner 上恰好装了哪台模拟器。
-          # -derivedDataPath 固定产物路径，方便后面打包 IPA。
+          # -SYMROOT 指定产物目录：-target 模式不允许 -derivedDataPath
+          #（它要求 -scheme），SYMROOT 是老式但有效的 build 位置覆盖。
           xcodebuild build \
             -project PdfReview.xcodeproj \
             -target PdfReview \
             -sdk iphonesimulator \
             -configuration Debug \
-            -derivedDataPath build \
+            -SYMROOT "$(pwd)/build" \
             CODE_SIGNING_ALLOWED=NO \
             OTHER_SWIFT_FLAGS='$(inherited) -warnings-as-errors' \
             2>&1 | tee build.log
