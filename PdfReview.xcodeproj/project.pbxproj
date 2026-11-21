@@ -155,6 +155,7 @@
 		ADA18F451EF8276025BD0754 /* generate_pbxproj.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "generate_pbxproj.py"; sourceTree = "<group>"; };
 		80242B1E441114EC9284ACB4 /* pick_simulator.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "pick_simulator.py"; sourceTree = "<group>"; };
 		7FB41FDB3BBBD20606DD8058 /* probe_pdf.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "probe_pdf.py"; sourceTree = "<group>"; };
+		76C07943486488252C90FDFC /* verify_static_check.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "verify_static_check.py"; sourceTree = "<group>"; };
 		BDCFF6A7F6E4864A50849064 /* PdfReview.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PdfReview.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F948097A0B3D35815607F191 /* PdfReviewWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PdfReviewWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -391,6 +392,7 @@
 				ADA18F451EF8276025BD0754,
 				80242B1E441114EC9284ACB4,
 				7FB41FDB3BBBD20606DD8058,
+				76C07943486488252C90FDFC,
 			);
 			name = "scripts";
 			path = "scripts";
