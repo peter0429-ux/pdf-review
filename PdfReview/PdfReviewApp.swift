@@ -38,6 +38,11 @@ struct PdfReviewApp: App {
     var body: some Scene {
         WindowGroup {
             AppRootView()
+                // 从别的 App「分享 → PDF 复习」送进来的文件走这里。
+                // 这条路径不经过任何文件选择器，是选择器出问题时的兜底入口。
+                .onOpenURL { url in
+                    ImportInbox.shared.receive(url)
+                }
         }
     }
 

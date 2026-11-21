@@ -253,12 +253,29 @@ struct ImportView: View {
     @Environment(\.dismiss) private var dismiss
 
     /// 由 RootView 注入：关掉导入面板并切到设置页。
-    var onOpenSettings: () -> Void = { }
+    let onOpenSettings: () -> Void
 
     @StateObject private var session = ImportSession()
 
-    @State private var showPDFPicker = false
-    @State private var showJSONPicker = false
+    /// 当前要弹出哪种选择器。
+    ///
+    /// 用一个枚举而不是两个 Bool：同一个视图上挂两个 `.sheet(isPresented:)`
+    /// SwiftUI 只会生效其中一个，另一个静默失效——那种 bug 极难看出来。
+    private enum PickerKind: String, Identifiable {
+        case pdf
+        case json
+        var id: String { rawValue }
+    }
+
+    @State private var activePicker: PickerKind?
+
+    /// 从「分享到本 App」送进来的文件。非 nil 时一进面板就直奔对应阶段。
+    let prefilled: ImportInbox.Pending?
+
+    init(prefilled: ImportInbox.Pending? = nil, onOpenSettings: @escaping () -> Void = { }) {
+        self.prefilled = prefilled
+        self.onOpenSettings = onOpenSettings
+    }
 
     var body: some View {
         NavigationStack {
@@ -291,41 +308,32 @@ struct ImportView: View {
                     }
                 }
             }
-            .fileImporter(
-                isPresented: $showPDFPicker,
-                // 只认 .pdf 时，有些来源（微信、部分网盘）会把 PDF 标成 public.data，
-                // 文件在选择器里是灰的。加泛类型兜底，选错了会在解析阶段提示「这不是 PDF」。
-                //
-                // 同时放 .item 和 .data：`.item`（public.item）在 UIDocumentPicker 里有
-                // 「导致所有文件变灰」的已知坑，社区做法是改用 `.data`（public.data）。
-                // 两个都给，which one 生效都能放行。
-                allowedContentTypes: [.pdf, .item, .data],
-                allowsMultipleSelection: false
-            ) { result in
-                switch result {
-                case let .success(urls):
-                    guard let url = urls.first else { return }
-                    session.preparePDF(url: url)
-                case let .failure(error):
-                    session.reset()
-                    // fileImporter 的取消也会走到这里，不当作错误弹窗。
-                    if (error as NSError).code != NSUserCancelledError {
-                        // 这里没有独立的错误槽位，用导入路径复现一次以拿到中文文案。
-                        print("选择 PDF 失败：\(error.localizedDescription)")
+            // 选择器改用自写的 DocumentPicker（见 DocumentPicker.swift）。
+            // 之前用 .fileImporter：选择器能弹出，但所有文件是灰的、点不中。
+            // [.pdf]、[.pdf,.item]、[.pdf,.item,.data] 三种都试过，全无效。
+            //
+            // 用 .sheet(item:) 挂一个选择器、由 activePicker 决定弹出哪一种。
+            // 不能挂两个 .sheet(isPresented:)：同一视图上 SwiftUI 只认第一个。
+            .sheet(item: $activePicker) { kind in
+                switch kind {
+                case .pdf:
+                    DocumentPicker { url in
+                        session.preparePDF(url: url)
+                    }
+                case .json:
+                    DocumentPicker { url in
+                        session.importAnalysisFile(url: url, store: store)
                     }
                 }
             }
-            .fileImporter(
-                isPresented: $showJSONPicker,
-                allowedContentTypes: AnalysisImporter.allowedContentTypes,
-                allowsMultipleSelection: false
-            ) { result in
-                switch result {
-                case let .success(urls):
-                    guard let url = urls.first else { return }
-                    session.importAnalysisFile(url: url, store: store)
-                case .failure:
-                    break
+            .task {
+                // 分享进来的文件：一进面板就直奔对应阶段，用户不用再点一次。
+                guard let prefilled else { return }
+                switch prefilled.kind {
+                case .pdf:
+                    session.preparePDF(url: prefilled.url)
+                case .analysis:
+                    session.importAnalysisFile(url: prefilled.url, store: store)
                 }
             }
         }
@@ -338,9 +346,7 @@ struct ImportView: View {
             Section {
                 Button {
                     if settings.isAIConfigured {
-                        showPDFPicker = true
-                    } else {
-                        // 没配 Key 就选 PDF 也是白跑，直接引导去设置。
+                        activePicker = .pdf
                     }
                 } label: {
                     entry(
@@ -354,7 +360,7 @@ struct ImportView: View {
                 .disabled(!settings.isAIConfigured)
 
                 Button {
-                    showJSONPicker = true
+                    activePicker = .json
                 } label: {
                     entry(
                         icon: "square.and.arrow.down",

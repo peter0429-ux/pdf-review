@@ -23,6 +23,7 @@
 		37B8453B83781F9D844B8EFB /* TagChips.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F9A54EDD76E4188448BCDEE /* TagChips.swift */; };
 		04D5559C516E4E69FA4F2F35 /* DeckDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078B708D9243E01075AAEB16 /* DeckDetailView.swift */; };
 		9C2EC0E3A35ADB925FB85D1D /* DeckListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 211AB6DBFEA6B79AA3D59069 /* DeckListView.swift */; };
+		C5E424E72E66C6301687D112 /* DocumentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D27299EB64D42D4061A53B00 /* DocumentPicker.swift */; };
 		59662A7F00F62FCE1AD25B35 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CC125324B34F084EA5C5EBB /* HistoryView.swift */; };
 		11A65F8BFEF9D750D4340CEC /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11DB1112D888C11454EBA21D /* ImportView.swift */; };
 		9DAB1F4CAB22322796EC4926 /* ImportingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2065A8654491136DC2D8908A /* ImportingView.swift */; };
@@ -40,6 +41,7 @@
 		23B86AEB1EB84D32053F09CF /* AIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 774E04B517C176547C7BB428 /* AIClient.swift */; };
 		611D3E576BAE5825BB2C2588 /* AnalysisImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F3BB28EBCFD69B94B96B8DC /* AnalysisImporter.swift */; };
 		94A54AE0B4BD17F248402FB6 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D67E7B5C9EE37A06BC20D3F9 /* AppSettings.swift */; };
+		6DBA401CDE3873FB7C4D8296 /* ImportInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA41CE66EC38C86C2E4BEDD8 /* ImportInbox.swift */; };
 		BFBE955B95F16319DDF6F434 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CF0C695C2870FED41C46DD3 /* KeychainStore.swift */; };
 		21057833B80FE211384B70CE /* LaunchLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05DAA0FD4CC9B40751BFAD35 /* LaunchLog.swift */; };
 		511E18AB707AE6AA63BF8BB2 /* PDFTextExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F43A08E3FA15B9DFCA3F436 /* PDFTextExtractor.swift */; };
@@ -102,6 +104,7 @@
 		8F9A54EDD76E4188448BCDEE /* TagChips.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TagChips.swift"; sourceTree = "<group>"; };
 		078B708D9243E01075AAEB16 /* DeckDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeckDetailView.swift"; sourceTree = "<group>"; };
 		211AB6DBFEA6B79AA3D59069 /* DeckListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeckListView.swift"; sourceTree = "<group>"; };
+		D27299EB64D42D4061A53B00 /* DocumentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentPicker.swift"; sourceTree = "<group>"; };
 		3CC125324B34F084EA5C5EBB /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HistoryView.swift"; sourceTree = "<group>"; };
 		11DB1112D888C11454EBA21D /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportView.swift"; sourceTree = "<group>"; };
 		2065A8654491136DC2D8908A /* ImportingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportingView.swift"; sourceTree = "<group>"; };
@@ -128,6 +131,7 @@
 		774E04B517C176547C7BB428 /* AIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIClient.swift"; sourceTree = "<group>"; };
 		1F3BB28EBCFD69B94B96B8DC /* AnalysisImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AnalysisImporter.swift"; sourceTree = "<group>"; };
 		D67E7B5C9EE37A06BC20D3F9 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppSettings.swift"; sourceTree = "<group>"; };
+		EA41CE66EC38C86C2E4BEDD8 /* ImportInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportInbox.swift"; sourceTree = "<group>"; };
 		2CF0C695C2870FED41C46DD3 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeychainStore.swift"; sourceTree = "<group>"; };
 		05DAA0FD4CC9B40751BFAD35 /* LaunchLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LaunchLog.swift"; sourceTree = "<group>"; };
 		5F43A08E3FA15B9DFCA3F436 /* PDFTextExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PDFTextExtractor.swift"; sourceTree = "<group>"; };
@@ -232,6 +236,7 @@
 				774E04B517C176547C7BB428,
 				1F3BB28EBCFD69B94B96B8DC,
 				D67E7B5C9EE37A06BC20D3F9,
+				EA41CE66EC38C86C2E4BEDD8,
 				2CF0C695C2870FED41C46DD3,
 				05DAA0FD4CC9B40751BFAD35,
 				5F43A08E3FA15B9DFCA3F436,
@@ -280,6 +285,7 @@
 				78B6B7C30ADB1C35144DE007 /* Components */,
 				078B708D9243E01075AAEB16,
 				211AB6DBFEA6B79AA3D59069,
+				D27299EB64D42D4061A53B00,
 				3CC125324B34F084EA5C5EBB,
 				11DB1112D888C11454EBA21D,
 				2065A8654491136DC2D8908A,
@@ -499,6 +505,7 @@
 				37B8453B83781F9D844B8EFB /* TagChips.swift in Sources */,
 				04D5559C516E4E69FA4F2F35 /* DeckDetailView.swift in Sources */,
 				9C2EC0E3A35ADB925FB85D1D /* DeckListView.swift in Sources */,
+				C5E424E72E66C6301687D112 /* DocumentPicker.swift in Sources */,
 				59662A7F00F62FCE1AD25B35 /* HistoryView.swift in Sources */,
 				11A65F8BFEF9D750D4340CEC /* ImportView.swift in Sources */,
 				9DAB1F4CAB22322796EC4926 /* ImportingView.swift in Sources */,
@@ -516,6 +523,7 @@
 				23B86AEB1EB84D32053F09CF /* AIClient.swift in Sources */,
 				611D3E576BAE5825BB2C2588 /* AnalysisImporter.swift in Sources */,
 				94A54AE0B4BD17F248402FB6 /* AppSettings.swift in Sources */,
+				6DBA401CDE3873FB7C4D8296 /* ImportInbox.swift in Sources */,
 				BFBE955B95F16319DDF6F434 /* KeychainStore.swift in Sources */,
 				21057833B80FE211384B70CE /* LaunchLog.swift in Sources */,
 				511E18AB707AE6AA63BF8BB2 /* PDFTextExtractor.swift in Sources */,
