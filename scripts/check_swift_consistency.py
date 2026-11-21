@@ -94,7 +94,7 @@ View Text Image Button VStack HStack ZStack Spacer ScrollView List ForEach
 NavigationStack NavigationLink NavigationSplitView Section Form Toggle TextField
 SecureField Slider Stepper Picker Label ProgressView Divider Group
 GeometryReader Color Font LinearGradient RoundedRectangle Capsule Circle Rectangle
-Material Shape ViewBuilder Binding State Environment EnvironmentObject
+Material Shape ViewBuilder Binding State StateObject ObservedObject Environment EnvironmentObject
 ObservableObject Published Observable Animation Transition Namespace ToolbarItem
 ToolbarItemGroup Menu Link ShareLink ContentUnavailableView DisclosureGroup
 LazyVStack LazyHStack Grid GridRow ViewThatFits AnyView TupleView ModifiedContent

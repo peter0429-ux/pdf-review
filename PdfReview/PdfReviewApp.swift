@@ -19,18 +19,30 @@ struct PdfReviewApp: App {
 
     /// 全局数据仓库。构造失败时它自己会降级到内存模式并记下 lastError，
     /// 不会抛错把 App 打挂。
-    @StateObject private var store = CardStore.shared
-    @StateObject private var settings = AppSettings.shared
+    ///
+    /// 注意这两个属性**不能**写成 `= CardStore.shared` 的默认值形式。
+    /// Swift 会在进入 init() 函数体之前先求值存储属性的默认值，那样
+    /// CardStore 就会在下面任何一行日志之前被构造出来——一旦它崩了，
+    /// 启动日志会是空的，看上去像「什么都没发生」，无法诊断。
+    /// 所以改成「无默认值 + 在 init() 里显式赋值」，把日志抢在前面。
+    @StateObject private var store: CardStore
+    @StateObject private var settings: AppSettings
 
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        // 最早的一行日志。App 若在构造 CardStore 时崩溃，下面 CardStore 里
-        // 那句「启动：」不会出现，据此就能判断崩在更早的位置。
+        // 最早的一行日志，必须发生在任何可能失败的构造之前。
         LaunchLog.note("=== PdfReview 启动 ===")
         LaunchLog.note("版本 \(Bundle.main.shortVersion)（build \(Bundle.main.buildNumber)）")
         LaunchLog.note("系统 \(ProcessInfo.processInfo.operatingSystemVersionString)")
         LaunchLog.note("日志位置 \(LaunchLog.currentFileURL?.path ?? "未知")")
+        LaunchLog.note("AppGroup 已停用 = \(AppGroup.isDisabled)")
+
+        _store = StateObject(wrappedValue: CardStore.shared)
+        _settings = StateObject(wrappedValue: AppSettings.shared)
+
+        // CardStore 里会再写一行「容器：…」，据此判断走到了哪一级降级。
+        LaunchLog.note("=== 初始化完成 ===")
     }
 
     var body: some Scene {

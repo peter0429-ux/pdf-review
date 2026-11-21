@@ -177,6 +177,19 @@ struct SettingsView: View {
                 Text(AppGroup.isContainerAvailable ? "共享容器（小组件可读）" : "App 本地（小组件读不到）")
                     .font(.footnote)
             }
+            if let reason = AppGroup.disableReason {
+                LabeledContent("共享容器已关闭") {
+                    Text(reason)
+                        .font(.footnote)
+                        .foregroundStyle(Color.orange)
+                }
+                Button("重新尝试共享容器") {
+                    AppGroup.resetAvailabilityForRetry()
+                    try? store.refreshRotationCache()
+                    toast = "已重置，重启 App 后生效"
+                }
+                .font(.footnote)
+            }
         } header: {
             Text("关于")
         } footer: {

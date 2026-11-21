@@ -46,31 +46,24 @@ final class CardStore: ObservableObject {
             CardDisplayRecord.self
         ])
 
-        LaunchLog.note("启动：AppGroup.isContainerAvailable = \(AppGroup.isContainerAvailable)")
+        // 顺序很重要：先落日志，再碰 App Group。
+        // 字符串插值会先求值、后调用 `note`——如果求值那一步把进程带走，
+        // 插值写法会导致日志一条都写不出来，看上去像「什么都没发生」。
+        LaunchLog.note("启动：开始创建数据容器")
 
-        // 三级降级，目标是「无论签名环境如何，App 都能启动」：
-        //  1. App Group 容器可用 → 用共享容器，小组件能读到同一份数据（正式形态）
-        //  2. 容器不可用（典型场景：用免费 Apple ID 侧载，provisioning profile
-        //     里没有 App Groups 能力，系统不会给容器）→ 退回 App 自己的本地
-        //     存储。数据照常持久化，只是小组件读不到。
-        //  3. 连本地存储都建不起来 → 内存模式，至少不至于白屏。
-        if AppGroup.isContainerAvailable {
-            do {
-                let configuration = ModelConfiguration(
-                    schema: schema,
-                    isStoredInMemoryOnly: false,
-                    allowsSave: true,
-                    groupContainer: .identifier(AppGroup.identifier)
-                )
-                container = try ModelContainer(for: schema, configurations: [configuration])
-                LaunchLog.note("容器：App Group 共享容器（小组件可读）")
-                return
-            } catch {
-                lastError = "共享数据容器创建失败，已退回本地存储：\(error.localizedDescription)"
-                LaunchLog.note("容器：共享容器失败 → \(error.localizedDescription)")
-            }
-        }
-
+        // 为什么这里**不用** `groupContainer:`？
+        //
+        // 架构上 SwiftData 只有 App 一个写者，小组件读的是物化出来的
+        // rotation-cache.json（见 docs/architecture.md 3.1）。把 SwiftData
+        // 库文件放进 App Group 共享容器不带来任何收益，却引入一个致命风险：
+        // 用免费 Apple ID 侧载时 provisioning profile 里没有 App Groups
+        // 能力，`ModelConfiguration(groupContainer:)` 在那种环境下会直接
+        // 崩——而且是 C 层的沙箱拒绝，不是可 catch 的 Swift 错误。
+        //
+        // 之前的实现把它放在第一级，于是「一打开就闪退」。现在改成本地存储，
+        // 小组件那条路单独用 AppGroup 的断路器兜（见 Shared/Core/AppGroup.swift）。
+        //
+        // 两级降级：本地持久化 → 内存。
         do {
             let configuration = ModelConfiguration(
                 schema: schema,
@@ -78,7 +71,7 @@ final class CardStore: ObservableObject {
                 allowsSave: true
             )
             container = try ModelContainer(for: schema, configurations: [configuration])
-            LaunchLog.note("容器：本地持久化（小组件读不到，属侧载降级）")
+            LaunchLog.note("容器：本地持久化")
             return
         } catch {
             lastError = "本地数据容器创建失败，已切换到临时存储：\(error.localizedDescription)"

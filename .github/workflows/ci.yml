@@ -96,6 +96,36 @@ jobs:
           zip -q -r PdfReview-unsigned.ipa Payload
           ls -lh PdfReview-unsigned.ipa
 
+      - name: 打包「无小组件」诊断版 IPA
+        # 用途：定位真机「一点就闪退」是不是内嵌 .appex 导致的。
+        #
+        # 模拟器不校验嵌套包的代码签名，所以这个问题在模拟器上永远不会出现。
+        # 真机上若 Sideloadly 没能正确重签 PlugIns/ 里的 .appex，dyld 会在
+        # 任何 Swift 代码执行之前就拒绝整个 bundle——表现是点图标立刻闪退、
+        # 没有崩溃报告、连启动日志都写不出来。
+        #
+        # 这个包把 PlugIns/ 整个去掉，逻辑与正式包完全一致，只是没有小组件。
+        # 若它能正常打开，就证明问题出在 .appex 的签名上。
+        run: |
+          APP=$(find build -type d -name "PdfReview.app" | head -1)
+          test -n "$APP" || { echo "::error::build 下找不到 PdfReview.app"; exit 1; }
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP" Payload/
+          rm -rf Payload/PdfReview.app/PlugIns
+          test ! -d Payload/PdfReview.app/PlugIns || { echo "::error::PlugIns 没删掉"; exit 1; }
+          zip -q -r PdfReview-apponly-unsigned.ipa Payload
+          echo "无小组件版内容："
+          unzip -l PdfReview-apponly-unsigned.ipa | head -25
+
+      - name: 上传诊断版 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PdfReview-apponly-ipa
+          path: PdfReview-apponly-unsigned.ipa
+          retention-days: 30
+          if-no-files-found: error
+
       - name: 判定编译结果
         if: always()
         run: |
