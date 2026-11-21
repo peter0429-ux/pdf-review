@@ -56,7 +56,7 @@ struct SettingsView: View {
         Section {
             LabeledContent("状态") {
                 Text(settings.isAIConfigured ? "已就绪" : "未配置")
-                    .foregroundStyle(settings.isAIConfigured ? .green : .secondary)
+                    .foregroundStyle(settings.isAIConfigured ? Color.green : Color.secondary)
             }
 
             TextField("https://api.openai.com/v1", text: $settings.baseURLString)
