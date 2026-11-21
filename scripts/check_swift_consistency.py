@@ -71,6 +71,16 @@ COMMENT_OR_STRING_RE = re.compile(
 # @Attribute、@Relationship 这类属性包装器 + #Preview 这类宏。
 ATTRIBUTE_RE = re.compile(r"(?:@|#)[A-Z][A-Za-z0-9_]*")
 
+# 条件编译指令整行剥掉。
+#
+# 为什么要专门处理：#if PROBE_MINIMAL 里的 PROBE_MINIMAL 是编译标志，
+# 大写开头，会被下面的「疑似未定义类型」检查当成类型引用而误报。
+# #else / #endif 没有条件表达式，一并吃掉不影响判断。
+CONDITIONAL_RE = re.compile(
+    r"^[ \t]*#(?:if|elseif|else|endif)\b[^\n]*$",
+    re.MULTILINE,
+)
+
 KEYWORDS = {
     "Self", "Any", "AnyObject", "Never", "Void", "True", "False", "Nil",
 }
@@ -149,6 +159,10 @@ def strip_noise(text: str) -> str:
 
     text = COMMENT_OR_STRING_RE.sub(blank, text)
     text = ATTRIBUTE_RE.sub("", text)
+    # 条件编译指令要在 ATTRIBUTE_RE 之后剥：ATTRIBUTE_RE 会匹配 "#if" 里的
+    # "#i"？不会——它要求 # 后面是大写字母，#if 的 i 是小写。所以顺序无关，
+    # 但放这里更清楚：先清掉宏和属性，再清条件编译行。
+    text = CONDITIONAL_RE.sub("", text)
     return text
 
 

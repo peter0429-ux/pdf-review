@@ -126,6 +126,52 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      - name: 编译最小诊断版（只有一个 Text，无 SwiftData / 无 App Group）
+        # 这一步是为了把「打不开」切成两半：
+        #   · 最小版能打开 → 问题在我们自己的初始化代码里
+        #   · 最小版也打不开 → 问题在签名/安装环节，与代码无关
+        #
+        # 真机上点图标立刻退出、且启动日志空白，说明进程在任何一行 Swift
+        # 代码执行之前就被终止了。在完整版上继续试没有意义，先确定范围。
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project PdfReview.xcodeproj \
+            -target PdfReview \
+            -sdk iphoneos \
+            -configuration Release \
+            SYMROOT="$(pwd)/probe" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            OTHER_SWIFT_FLAGS='$(inherited) -DPROBE_MINIMAL -warnings-as-errors' \
+            2>&1 | tee probe-build.log
+          grep -q "BUILD SUCCEEDED" probe-build.log || {
+            echo "::error::最小诊断版编译失败"
+            grep -E "error:" probe-build.log | head -40 || true
+            exit 1
+          }
+
+      - name: 打包最小诊断版 IPA
+        run: |
+          APP=$(find probe -type d -name "PdfReview.app" | head -1)
+          test -n "$APP" || { echo "::error::probe 下找不到 PdfReview.app"; find probe -maxdepth 4 -type d | head -20; exit 1; }
+          echo "找到产物: $APP"
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP" Payload/
+          # 最小版同样去掉小组件，排除 .appex 因素
+          rm -rf Payload/PdfReview.app/PlugIns
+          zip -q -r PdfReview-probe-unsigned.ipa Payload
+          ls -lh PdfReview-probe-unsigned.ipa
+
+      - name: 上传最小诊断版 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PdfReview-probe-ipa
+          path: PdfReview-probe-unsigned.ipa
+          retention-days: 30
+          if-no-files-found: error
+
       - name: 判定编译结果
         if: always()
         run: |
