@@ -47,6 +47,7 @@
 		511E18AB707AE6AA63BF8BB2 /* PDFTextExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F43A08E3FA15B9DFCA3F436 /* PDFTextExtractor.swift */; };
 		47D951E6B21A79341A00B0FC /* CardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 287EE3B76BAC573146FC7BA1 /* CardStore.swift */; };
 		C2C64862E2FC9CF80A72A96E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAE48748DF0CB279500B65C3 /* Assets.xcassets */; };
+		4C3C0879718223234A962B5A /* seed-analysis.pdfreview.json in Resources */ = {isa = PBXBuildFile; fileRef = 06DA27E0DD9B41AD8F57E84E /* seed-analysis.pdfreview.json */; };
 		AD376C6BB390B26BB76D1D08 /* CardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76519372A76BF90138CB97E5 /* CardViews.swift */; };
 		7DC9DEB799B2AA8E931FB1DF /* FavoriteIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B3350708910FEE63E405173 /* FavoriteIntent.swift */; };
 		C972047171AA07EE6F8CEEDC /* NextCardIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D5D31E8240F5FD60F54751 /* NextCardIntent.swift */; };
@@ -57,6 +58,7 @@
 		EF5B34365F4D8F263CC92C9C /* RotationCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9F33B8C541B969F6CE2734F /* RotationCache.swift */; };
 		0DE2AEDB859ABDDF561B57BB /* RotationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F527C5E7590DB6828E44680E /* RotationScheduler.swift */; };
 		CE6C4EFFE57F785278ED4E7A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 743A5B1DAB7EF5A35831DEB3 /* Assets.xcassets */; };
+		E0979538877082AD0F584C6A /* rotation-cache.json in Resources */ = {isa = PBXBuildFile; fileRef = 0E76EFFC28EF46FC733779B8 /* rotation-cache.json */; };
 		9518DC4A6D1A1B4B2157AD8A /* PdfReviewWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F948097A0B3D35815607F191 /* PdfReviewWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -91,6 +93,7 @@
 		AAE48748DF0CB279500B65C3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
 		4783B93582633D7FBC3F1F6D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 		CF04ED985E499247C5B8CB7D /* PdfReview.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "PdfReview.entitlements"; sourceTree = "<group>"; };
+		06DA27E0DD9B41AD8F57E84E /* seed-analysis.pdfreview.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "seed-analysis.pdfreview.json"; sourceTree = "<group>"; };
 		7103F12E52D4F14B11513A34 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootView.swift"; sourceTree = "<group>"; };
 		6EFBC52D403CAEAE684EE7BC /* CardEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CardEditorView.swift"; sourceTree = "<group>"; };
 		3F566B9C9AF79B60DAC2E5E7 /* CardFaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CardFaceView.swift"; sourceTree = "<group>"; };
@@ -120,6 +123,7 @@
 		743A5B1DAB7EF5A35831DEB3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
 		F9D2F0E4933C4DF9851E79FD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 		1BE9BC1AEF3996684A22B650 /* PdfReviewWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "PdfReviewWidget.entitlements"; sourceTree = "<group>"; };
+		0E76EFFC28EF46FC733779B8 /* rotation-cache.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "rotation-cache.json"; sourceTree = "<group>"; };
 		502F777995883182B2082D47 /* RotationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RotationProvider.swift"; sourceTree = "<group>"; };
 		D8D4F774E7053BF6466549D2 /* AppGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppGroup.swift"; sourceTree = "<group>"; };
 		E9F33B8C541B969F6CE2734F /* RotationCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RotationCache.swift"; sourceTree = "<group>"; };
@@ -142,6 +146,7 @@
 		D02430A686A99489B465A858 /* sample-analysis-minimal.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "sample-analysis-minimal.json"; sourceTree = "<group>"; };
 		CB3E13C0C23BF1F2376B86EE /* sample-analysis.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "sample-analysis.json"; sourceTree = "<group>"; };
 		A956564DCA7C4080475855AD /* analysis.v1.schema.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "analysis.v1.schema.json"; sourceTree = "<group>"; };
+		3699D51C5465B587FF19536A /* build_seed_cache.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "build_seed_cache.py"; sourceTree = "<group>"; };
 		0B5FABEA8B04447B1816AC7E /* check_format_consistency.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "check_format_consistency.py"; sourceTree = "<group>"; };
 		78D8C2E12802C52EE48743CA /* check_pbxproj.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "check_pbxproj.py"; sourceTree = "<group>"; };
 		6BDCB570B4A713DAC6B91D80 /* check_swift_consistency.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "check_swift_consistency.py"; sourceTree = "<group>"; };
@@ -274,6 +279,7 @@
 				AAE48748DF0CB279500B65C3,
 				4783B93582633D7FBC3F1F6D,
 				CF04ED985E499247C5B8CB7D,
+				06DA27E0DD9B41AD8F57E84E,
 			);
 			name = "Resources";
 			path = "Resources";
@@ -337,6 +343,7 @@
 				743A5B1DAB7EF5A35831DEB3,
 				F9D2F0E4933C4DF9851E79FD,
 				1BE9BC1AEF3996684A22B650,
+				0E76EFFC28EF46FC733779B8,
 			);
 			name = "Resources";
 			path = "Resources";
@@ -375,6 +382,7 @@
 		85ABD5009F67F716AA06490E /* scripts */ = {
 			isa = PBXGroup;
 			children = (
+				3699D51C5465B587FF19536A,
 				0B5FABEA8B04447B1816AC7E,
 				78D8C2E12802C52EE48743CA,
 				6BDCB570B4A713DAC6B91D80,
@@ -471,6 +479,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C2C64862E2FC9CF80A72A96E /* Assets.xcassets in Resources */,
+				4C3C0879718223234A962B5A /* seed-analysis.pdfreview.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -479,6 +488,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CE6C4EFFE57F785278ED4E7A /* Assets.xcassets in Resources */,
+				E0979538877082AD0F584C6A /* rotation-cache.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

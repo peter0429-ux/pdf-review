@@ -71,25 +71,37 @@ struct RotationEntryView: View {
 // MARK: - 空态
 
 /// 统一的空态视图：没有 cache 或卡片池为空时使用。
+///
+/// 文案分两种：签名缺 App Groups 时，App 写的数据小组件读不到，若还说
+/// 「在 App 中导入 PDF 后即可」用户会一直等一个不会发生的事。
 struct EmptyStateView: View {
 
     var compact: Bool = false
+    /// 是否因为签名缺 App Groups 而读不到共享数据。
+    var sharedDataUnavailable: Bool = false
 
     var body: some View {
         VStack(spacing: compact ? 6 : 10) {
-            Image(systemName: "doc.badge.plus")
+            Image(systemName: sharedDataUnavailable ? "exclamationmark.triangle" : "doc.badge.plus")
                 .font(.system(size: compact ? 24 : 34, weight: .regular))
                 .foregroundStyle(.secondary)
 
-            Text("在 App 中导入 PDF 后即可在此复习")
+            Text(message)
                 .font(compact ? .caption2 : .footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .lineLimit(3)
+                .lineLimit(4)
                 .minimumScaleFactor(0.85)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 4)
+    }
+
+    private var message: String {
+        if sharedDataUnavailable {
+            return "小组件读不到共享数据：当前签名缺少 App Groups 能力。改用带 App Groups 的签名后即可显示你导入的 PDF。"
+        }
+        return "在 App 中导入 PDF 后即可在此复习"
     }
 }
 
@@ -123,7 +135,10 @@ struct SmallCardView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
-            EmptyStateView(compact: true)
+            // entry.current 为 nil 有两种可能：真没导入过，或签名缺 App Groups
+            // 导致读不到 App 写的缓存。后者要靠 source 区分，否则用户会一直
+            // 等着一个不会出现的卡片。
+            EmptyStateView(compact: true, sharedDataUnavailable: entry.source == .bundledSeed)
         }
     }
 
@@ -211,7 +226,7 @@ struct MediumCardView: View {
                     .frame(width: 118, alignment: .topLeading)
             }
         } else {
-            EmptyStateView()
+            EmptyStateView(sharedDataUnavailable: entry.source == .bundledSeed)
         }
     }
 }
@@ -267,7 +282,7 @@ struct LargeCardView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
-            EmptyStateView()
+            EmptyStateView(sharedDataUnavailable: entry.source == .bundledSeed)
         }
     }
 }
@@ -484,6 +499,14 @@ struct ProgressFooter: View {
             }
 
             Spacer(minLength: 2)
+
+            if entry.source == .bundledSeed {
+                // 内置内容时明确告知：这些不是用户导入的 PDF，换一份签名才会变。
+                Label("内置", systemImage: "shippingbox")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .labelStyle(.titleAndIcon)
+            }
 
             Text(entry.rotationRemainingText)
                 .font(.caption2)

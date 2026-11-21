@@ -58,9 +58,15 @@ WIDGET_SOURCES = [WIDGET_TARGET]
 
 APP_RESOURCES = [
     "PdfReview/Resources/Assets.xcassets",
+    # 内置种子分析文件：首次启动时导入成一幅牌组，
+    # 让「装完就有内容可复习」而不是面对一个空列表。
+    "PdfReview/Resources/seed-analysis.pdfreview.json",
 ]
 WIDGET_RESOURCES = [
     "PdfReviewWidget/Resources/Assets.xcassets",
+    # 内置种子轮换缓存：侧载签名拿不到 App Groups 时，小组件读不到 App 写
+    # 的数据，靠这份随包资源才不至于一直显示空态。
+    "PdfReviewWidget/Resources/rotation-cache.json",
 ]
 
 APP_INFO_PLIST = "PdfReview/Resources/Info.plist"

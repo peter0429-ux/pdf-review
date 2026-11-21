@@ -190,12 +190,18 @@ struct SettingsView: View {
                 }
                 .font(.footnote)
             }
+            LabeledContent("内置内容") {
+                Text(UserDefaults.standard.bool(forKey: SharedKeys.seedImported)
+                     ? "已导入（内置示例牌组）"
+                     : "尚未导入")
+                    .font(.footnote)
+            }
         } header: {
             Text("关于")
         } footer: {
             Text(AppGroup.isContainerAvailable
                  ? "App 与小组件通过 App Group 共享数据，桌面上的卡片会跟着这里的数据变化。"
-                 : "当前签名方式没有 App Groups 能力（侧载时常见），数据只存在 App 自己的沙盒里。App 里的功能全部可用，但桌面小组件读不到卡片。")
+                 : "当前签名方式没有 App Groups 能力（侧载时常见），数据只存在 App 自己的沙盒里。App 里的功能全部可用，但桌面小组件读不到卡片——它显示的是随 App 内置的一组内容。想让它显示你导入的 PDF，需要换成带 App Groups 能力的签名。")
         }
     }
 

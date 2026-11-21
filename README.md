@@ -41,7 +41,8 @@ pdf-review/
 │   ├── generate_pbxproj.py          # 生成 project.pbxproj
 │   ├── check_pbxproj.py             # 独立解析+校验 pbxproj（自写 OpenStep 解析器）
 │   ├── check_swift_consistency.py   # 跨文件类型可见性检查
-│   └── check_format_consistency.py  # schema/Swift/文档三方一致性
+│   ├── check_format_consistency.py  # schema/Swift/文档三方一致性
+│   └── build_seed_cache.py          # 把分析文件转成小组件用的种子缓存
 ├── Shared/                  # 双端共享
 │   ├── Core/                # ← 这三个文件编进 App 和 Widget 两个 target
 │   │   ├── AppGroup.swift
@@ -51,11 +52,15 @@ pdf-review/
 │   ├── Service/             # AI / PDF / Keychain / 设置（仅 App target）
 │   └── Store/               # CardStore（仅 App target）
 ├── PdfReview/               # App target（SwiftUI 视图）
+│   └── Resources/           # 含 seed-analysis.pdfreview.json（内置牌组）
 ├── PdfReviewWidget/         # Widget target（Timeline Provider + App Intents）
+│   └── Resources/           # 含 rotation-cache.json（内置轮换缓存）
 └── PdfReview.xcodeproj/
 ```
 
 **关键红线**：`Shared/Core/` 三个文件是唯一的双 target 文件；Widget target 禁止 `import SwiftData`。`scripts/check_pbxproj.py` 会自动验证这两条。
+
+**为什么有两份种子**：`seed-analysis.pdfreview.json`（App）与 `rotation-cache.json`（Widget）是同源异体的两份资源，不是重复文件——前者是导入格式，后者是轮换缓存格式。改内容要改前者再跑 `python scripts/build_seed_cache.py` 生成后者，别手工同步。详见 [docs/architecture.md](docs/architecture.md) 的 5.1 节。
 
 ## 快速开始（macOS）
 

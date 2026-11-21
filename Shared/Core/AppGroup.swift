@@ -199,4 +199,9 @@ enum SharedKeys {
     static let favoriteCardIDs = "favorites.cardIDs"
     /// 最近一次 App 侧刷新缓存的时间，用于诊断。类型：Double（timeIntervalSince1970）
     static let lastCacheRefresh = "rotation.lastRefresh"
+    /// 内置的种子牌组是否已导入过（打完就再也不导，用户删掉也不会又冒出来）。
+    /// 放在 `UserDefaults.standard` 而不是 App Group 里：这是「这台设备这个 App
+    /// 装过一次」的本地事实，跟签名有没有 App Groups 无关。
+    /// 类型：Bool
+    static let seedImported = "seed.deckImported"
 }

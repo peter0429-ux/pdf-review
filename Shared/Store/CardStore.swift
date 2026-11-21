@@ -364,6 +364,65 @@ final class CardStore: ObservableObject {
     }
 }
 
+// MARK: - 内置种子牌组
+
+extension CardStore {
+
+    /// 首次启动时把内置的分析文件导入成一幅牌组。
+    ///
+    /// 为什么需要它：侧载（免费 Apple ID / 通配符描述文件的企业签名）拿不到
+    /// App Groups，小组件读不到 App 写的数据，桌面会一直是空的。内置一份种子
+    /// 内容让「装完就能看到东西」，而 App 里也必须有同一份，否则会出现
+    /// 「桌面上有卡片、App 里空空」这种更让人困惑的状态。
+    ///
+    /// **幂等**：用 `UserDefaults.standard` 里的 `SharedKeys.seedImported` 打标记，
+    /// 只导一次。用户要是把它删了，不该在下次启动时又冒出来。
+    ///
+    /// - Returns: 真的导入了才返回牌组 ID；已导过、无种子、或种子损坏返回 nil。
+    @discardableResult
+    func importSeedDeckIfNeeded(bundle: Bundle = .main) -> UUID? {
+        let flags = UserDefaults.standard
+        guard !flags.bool(forKey: SharedKeys.seedImported) else { return nil }
+
+        // 先打标记，再干活。理由不是「失败就算了」，而是防崩溃循环：
+        // 万一导入过程本身把进程带走，下次启动就不会再撞同一堵墙。
+        // 可捕获的错误（文件缺失、校验失败）在下面会把标记复位，所以那种
+        // 情况仍有重试机会——所以这个提前量只用来兜「崩掉」这一种。
+        flags.set(true, forKey: SharedKeys.seedImported)
+
+        // 注意资源名与扩展名的切分：文件名是 seed-analysis.pdfreview.json，
+        // 真正的扩展名只有最后一段 "json"。写成 withExtension: "pdfreview.json"
+        // 依赖 Foundation 把两段拼在一起，能跑但不该依赖。
+        guard let url = bundle.url(forResource: "seed-analysis.pdfreview", withExtension: "json") else {
+            LaunchLog.note("种子：bundle 里找不到 seed-analysis.pdfreview.json")
+            flags.set(false, forKey: SharedKeys.seedImported)
+            return nil
+        }
+
+        do {
+            // load(from:) 内部已经做过 validate，这里不重复。
+            let document = try AnalysisDocument.load(from: url)
+
+            let deckID = try insertDeck(
+                title: document.deck.title,
+                sourceFileName: document.source.fileName,
+                sourceKind: "imported",
+                pageCount: document.source.pageCount,
+                summary: document.deck.summary,
+                language: document.deck.language,
+                cards: document.cards
+            )
+            LaunchLog.note("种子：已导入内置牌组「\(document.deck.title)」，\(document.cards.count) 张卡片")
+            return deckID
+        } catch {
+            // 我们活着走到了这里，说明没崩——复位标记，给下次启动留一条重试的路。
+            flags.set(false, forKey: SharedKeys.seedImported)
+            LaunchLog.note("种子：导入失败（标记已复位，下次启动会重试）→ \(error.localizedDescription)")
+            return nil
+        }
+    }
+}
+
 // MARK: - 布隆式收藏同步
 
 extension CardStore {

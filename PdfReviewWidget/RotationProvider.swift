@@ -89,6 +89,17 @@ struct RotationEntry: TimelineEntry {
     /// 所以倒计时必须以 slotStart 为锚点。
     var slotStart: Date? = nil
 
+    /// 数据来源。空态文案要据此区分「还没导入过」和「签名缺 App Groups」，
+    /// 否则用户会一直等一个不会发生的事。
+    var source: DataSource = .shared
+
+    enum DataSource {
+        /// App 通过 App Group 共享容器写入的真实数据。
+        case shared
+        /// 内置种子（签名缺 App Groups 或 App 尚未写过缓存）。
+        case bundledSeed
+    }
+
     /// 倒计时锚点。
     var rotationAnchor: Date { slotStart ?? date }
 }
@@ -112,6 +123,27 @@ struct RotationProvider: TimelineProvider {
     /// 最后一个 entry 之后多久再续排。
     private static let trailingDelay: TimeInterval = 60
 
+    // MARK: 缓存读取（带内置种子兜底）
+
+    /// 读缓存，三级降级（实现见 `RotationCache.resolve`）：
+    ///
+    /// 1. **共享容器**里的 `rotation-cache.json` —— 正常路径。App 导入 PDF 后
+    ///    由 `CardStore.refreshRotationCache()` 写入，是最新的真实数据。
+    /// 2. **本进程缓存位置**里的同文件 —— 上一轮已把种子复制过来的副本，
+    ///    带用户自己的收藏/手动翻页状态。
+    /// 3. **内置种子**（bundle 资源）—— 首次安装、App 还没跑过、或签名缺
+    ///    App Groups 时，保证小组件不显示空态。读到后会复制进本进程容器，
+    ///    因为 `NextCardIntent` / `ToggleFavoriteIntent` 都要写缓存。
+    ///
+    /// 前两级在 App 进程里是同一个路径（App Group 容器，不可用时退化为
+    /// App 自己的 Documents）；在 Widget 进程里是两个不同沙盒，
+    /// 这正是需要种子兜底的原因。
+    private static func loadCache() -> (cache: RotationCache, isSeeded: Bool)? {
+        let resolved = RotationCache.resolve()
+        guard let cache = resolved.cache else { return nil }
+        return (cache, resolved.isSeeded)
+    }
+
     // MARK: TimelineProvider
 
     func placeholder(in context: Context) -> RotationEntry {
@@ -133,14 +165,16 @@ struct RotationProvider: TimelineProvider {
         let now = Date()
 
         // cache 不存在或卡片池为空：先给占位，15 分钟后再试。
-        guard let cache = RotationCache.load(), !cache.cards.isEmpty else {
+        guard let resolved = loadCache() else {
             let entry = RotationProvider.emptyEntry(now: now)
             let policy = TimelineReloadPolicy.after(now.addingTimeInterval(RotationProvider.retryInterval))
             completion(Timeline(entries: [entry], policy: policy))
             return
         }
 
-        let timelineEntries = RotationProvider.entries(now: now, cache: cache)
+        let timelineEntries = RotationProvider.entries(
+            now: now, cache: resolved.cache, isSeeded: resolved.isSeeded
+        )
         let lastDate = timelineEntries.last?.date ?? now
         let refreshDate = lastDate.addingTimeInterval(RotationProvider.trailingDelay)
         completion(Timeline(entries: timelineEntries, policy: .after(refreshDate)))
@@ -172,14 +206,19 @@ struct RotationProvider: TimelineProvider {
     }
 
     private static func firstEntry(now: Date) -> RotationEntry {
-        guard let cache = RotationCache.load(), !cache.cards.isEmpty else {
+        guard let resolved = loadCache() else {
             return emptyEntry(now: now)
         }
-        return entries(now: now, cache: cache).first ?? emptyEntry(now: now)
+        return entries(now: now, cache: resolved.cache, isSeeded: resolved.isSeeded).first
+            ?? emptyEntry(now: now)
     }
 
     /// 预排 entryCount 个 entry：当前轮 + 后续轮。
-    private static func entries(now: Date, cache: RotationCache) -> [RotationEntry] {
+    private static func entries(
+        now: Date,
+        cache: RotationCache,
+        isSeeded: Bool
+    ) -> [RotationEntry] {
         let interval = normalizedInterval(cache)
         let scheduled = RotationScheduler.upcoming(at: now, count: entryCount, cache: cache)
         let currentSlot = RotationScheduler.slot(at: now, cache: cache)
@@ -221,7 +260,8 @@ struct RotationProvider: TimelineProvider {
                 upcomingCount: upcomingCounts[offset],
                 totalCards: cache.cards.count,
                 intervalHours: interval,
-                slotStart: slot.start
+                slotStart: slot.start,
+                source: isSeeded ? .bundledSeed : .shared
             )
         }
     }

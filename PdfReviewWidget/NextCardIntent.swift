@@ -24,7 +24,11 @@ struct NextCardIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         // cache 可能是首次加载或已被清空：此时无可前进的内容，只刷新一次。
-        if let cache = RotationCache.load(), !cache.cards.isEmpty {
+        //
+        // 用 loadResolved 而非 load：签名缺 App Groups 时，小组件的数据来自
+        // 内置种子。「下一张」要能在那种环境下也生效，就必须读到种子
+        // （loadResolved 会顺手把它落地成本进程可写副本）。
+        if let cache = RotationCache.loadResolved(), !cache.cards.isEmpty {
             // 偏移量的真相源是 App Group defaults（App 侧 advanceToNextCard()
             // 也是先读 defaults 再 +1），cache 只是它的镜像。
             // 但 defaults 里可能根本没有这个键（用户从未点过「下一张」，

@@ -87,6 +87,16 @@ struct AppRootView: View {
         let settings = AppSettings.shared
         LaunchLog.note("AppSettings 构造完成")
 
+        // 内置种子牌组：只导一次。放在这里而不是 performStartupMaintenance，
+        // 是因为它要在「回填历史」之前跑完——种子卡片一旦入库，历史与轮换
+        // 缓存都应该按含它的卡片池来算。
+        LaunchLog.note("种子：检查是否需要导入内置牌组")
+        if let seedDeckID = store.importSeedDeckIfNeeded() {
+            LaunchLog.note("种子：导入完成，牌组 ID = \(seedDeckID)")
+        } else {
+            LaunchLog.note("种子：无需导入")
+        }
+
         // 一旦容器建不起来、退到内存模式，这里不会崩，但我希望用户看得见。
         phase = .ready(store, settings)
 

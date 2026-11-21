@@ -250,6 +250,36 @@ enum AnalysisKeys {                       // Keychain/UserDefaults 键名
 
 Widget 不写 SwiftData；Intent 只写 App Group 的轻量状态。
 
+### 5.1 无 App Groups 时的降级路径（内置种子）
+
+App Groups 要求 provisioning profile 绑定**明确的 App ID** 并登记该 group。
+侧载场景（免费 Apple ID、以及国内常见的通配符描述文件企业签名）通常不满足，
+`FileManager.containerURL(forSecurityApplicationGroupIdentifier:)` 会返回 nil 或
+给出一个不可写目录。这时小组件与 App 是两个互不相通的沙盒，**App 写的数据
+小组件永远读不到**，桌面会一直是空态。
+
+处理方式是随包预置一份内容，让「装完就有东西可看」，而不是显示一句
+永远等不到的「导入 PDF 后即可复习」。
+
+| 环节 | 落点 | 说明 |
+|---|---|---|
+| 种子源 | `PdfReview/Resources/seed-analysis.pdfreview.json` | 与用户手动导入的格式完全相同，走同一套 `AnalysisDocument` + `AnalysisValidator` |
+| 生成小组件缓存 | `PdfReviewWidget/Resources/rotation-cache.json` | 由 `scripts/build_seed_cache.py` 从上面那份生成，**同一份内容两种编码** |
+| Widget 读取 | `RotationCache.resolve(bundle:)` | 三级：共享容器 → 本进程容器里的副本 → 内置种子 |
+| Widget 写入 | `RotationCache.seedOwnContainerIfNeeded(bundle:)` | 读到种子后复制进自己容器，否则 `NextCardIntent` 的写盘无处落地 |
+| App 读取 | `CardStore.importSeedDeckIfNeeded(bundle:)` | 首次启动导入成一幅 `ReviewDeck`，用 `SharedKeys.seedImported` 保证只导一次 |
+
+两条必须守住的性质：
+
+1. **`epoch` 必须固定为常量**（当前 `2026-01-01T00:00:00Z`），不能取「首次启动时间」。
+   `slotIndex = floor((now - epoch) / intervalHours) + manualOffset`，
+   epoch 一旦随设备/安装时间变化，各设备算出的槽位就不同，重装后轮换位置还会跳变。
+2. **卡片 ID 由题面文本派生**（`stable_uuid`，`scripts/build_seed_cache.py`），
+   不能是随机 UUID。种子重新生成时 ID 必须不变，否则用户收藏会全部丢失。
+
+小组件据此区分空态文案：`RotationEntry.source == .bundledSeed` 时说明
+「当前签名缺少 App Groups 能力」，而不是让用户以为导入功能坏了。
+
 ## 6. 目录结构
 
 ```
@@ -260,6 +290,18 @@ docs/              架构、格式、搭建、自检
 schema/  samples/  scripts/
 ```
 
+两个种子资源分属不同 target，不能合并成一个：
+
+```
+PdfReview/Resources/seed-analysis.pdfreview.json         → App target Resources
+PdfReviewWidget/Resources/rotation-cache.json            → Widget target Resources
+```
+
+它们**不是**同一份文件的副本：前者是 `AnalysisDocument`（`cards` 用
+`question`/`answer` 等业务字段），后者是 `RotationCache`（`cards` 用
+`CardSnapshot`，多出 `deckTitle`/`isFavorite`、日期为刻度基准）。让它们保持
+同源靠的是 `scripts/build_seed_cache.py` 单向生成，不是手工同步。
+
 ## 7. 一致性红线
 
 1. `RotationScheduler` 必须是纯函数，**不得**读 SwiftData、网络、时钟（时间由参数传入）。
@@ -267,3 +309,4 @@ schema/  samples/  scripts/
 3. Widget target **不得** `import SwiftData`。
 4. App 的 `AnalysisDocument` 结构与 `schema/analysis.v1.schema.json` 必须一致。
 5. 所有面向用户的文案使用简体中文。
+6. 种子的 `epoch` 与卡片 ID 必须可复现（常量 + 文本派生），**不得**引入随机或时钟相关的初值。
