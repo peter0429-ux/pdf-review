@@ -48,5 +48,84 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+
+	<!-- ==================================================================== -->
+	<!-- 文档类型声明。                                                        -->
+	<!--                                                                      -->
+	<!-- 为什么要声明：文档选择器（fileImporter）的 `.item` 过滤只管「列表里    -->
+	<!-- 显不显示」，而文件**能不能被选中**还受另一层约束——系统要确认 App       -->
+	<!-- 声明了它能处理这些类型。json / pdfreview 若从未声明，文档选择器里      -->
+	<!-- 就会呈现为灰色不可选，用户看到的正是这个现象。                        -->
+	<!-- ==================================================================== -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<!-- 自定义 .pdfreview.json 分析文件 -->
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>PDF 复习分析文件</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.pdfreview.analysis</string>
+			</array>
+		</dict>
+		<!-- 通用 JSON（微信/AirDrop 传来的 .json 常被标成 public.data，这里也接住） -->
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>JSON 文件</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.json</string>
+				<string>public.data</string>
+			</array>
+		</dict>
+		<!-- PDF 讲义 -->
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>PDF 文件</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- 注册自定义扩展名 .pdfreview.json → UTI com.pdfreview.analysis。
+	     没有这段，UTType(filenameExtension: "pdfreview") 只能拿到 dyn.*
+	     动态标识符，整个类型过滤都会失效（此前「选不中」的根因之一）。 -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.pdfreview.analysis</string>
+			<key>UTTypeDescription</key>
+			<string>PDF 复习分析文件</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<!-- 注意：扩展名只能是不含点的单个后缀。我们的文件叫
+					     「xxx.pdfreview.json」，实际扩展名是 json，所以这里写 json。
+					     写成 "pdfreview.json" 是无效的（系统不会匹配）。 -->
+					<string>json</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/json</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>
+

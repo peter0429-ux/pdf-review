@@ -2,31 +2,31 @@
 //  PdfReviewApp.swift
 //  PdfReview
 //
-//  App 入口。三件事：建 ModelContainer、注入共享状态、首次启动做一次性维护。
+//  App 入口。这里刻意保持**极薄**：不构造任何单例、不做任何维护。
 //
-//  维护时机很关键：小组件和 App 必须看到同一份轮换状态，所以每次进入前台
-//  都要把 SwiftData 重新物化成 App Group 里的 rotation-cache.json，并回填
-//  已经过去的槽位到历史记录。否则用户装好小组件几小时后打开 App，历史页
-//  会是空的——而小组件明明已经换过好几张卡了。
+//  为什么（有真机证据，别改回去）：
+//  之前把 `CardStore.shared` / `AppSettings.shared` 放在 App 的存储属性里，
+//  Swift 会在 `App.init()` 之前就求值它们——那时 SwiftUI 还没起来，真机上
+//  进程直接就没了，启动日志一条都写不出来。把同样的构造挪到「首帧之后」
+//  （`AppRootView.bootstrap()`），真机就能正常进入界面。
+//
+//  所以分工是：
+//    · 本文件   —— 只交出窗口，一个语句都不多做
+//    · AppRootView.swift —— 首帧后建容器、跑维护、渲染 RootView
+//
+//  另外 `scenePhase` 回到前台时的刷新也放在 AppRootView 里，因为它需要拿到
+//  已经构造好的 store。
 //
 
 import SwiftUI
-import SwiftData
-import WidgetKit
 
 @main
 struct PdfReviewApp: App {
 
 #if PROBE_MINIMAL
-    // ── 诊断用最小模式 ──────────────────────────────────────────────
-    // 编译时加 -DPROBE_MINIMAL 会走这一支。
-    //
-    // 第一版这里只有一个 Text，真机验证结果：**能正常打开**。由此确认签名和
-    // 安装环节没有问题，闪退出在 App 自己的初始化代码里。
-    //
-    // 第二版改成 ProbeRootView：按顺序执行 7 个可疑动作，每步之间停一下，
-    // 并且**在执行前**先把「正在执行第 N 步」画到屏幕上。真机崩溃一闪而过
-    // 拿不到日志，屏幕上留下的最后一句话就是崩溃位置。
+    // ── 诊断模式 ────────────────────────────────────────────────────
+    // 编译时加 -DPROBE_MINIMAL 走这一支，按顺序跑 7 个可疑动作并把进度画在
+    // 屏幕上，用于真机上定位崩溃点。正常构建不会编到这里。
     var body: some Scene {
         WindowGroup {
             ProbeRootView()
@@ -35,81 +35,9 @@ struct PdfReviewApp: App {
 
 #else
 
-    /// 全局数据仓库。构造失败时它自己会降级到内存模式并记下 lastError，
-    /// 不会抛错把 App 打挂。
-    ///
-    /// 注意这两个属性**不能**写成 `= CardStore.shared` 的默认值形式。
-    /// Swift 会在进入 init() 函数体之前先求值存储属性的默认值，那样
-    /// CardStore 就会在下面任何一行日志之前被构造出来——一旦它崩了，
-    /// 启动日志会是空的，看上去像「什么都没发生」，无法诊断。
-    /// 所以改成「无默认值 + 在 init() 里显式赋值」，把日志抢在前面。
-    @StateObject private var store: CardStore
-    @StateObject private var settings: AppSettings
-
-    @Environment(\.scenePhase) private var scenePhase
-
-    init() {
-        // 最早的一行日志，必须发生在任何可能失败的构造之前。
-        LaunchLog.note("=== PdfReview 启动 ===")
-        LaunchLog.note("版本 \(Bundle.main.shortVersion)（build \(Bundle.main.buildNumber)）")
-        LaunchLog.note("系统 \(ProcessInfo.processInfo.operatingSystemVersionString)")
-        LaunchLog.note("日志位置 \(LaunchLog.currentFileURL?.path ?? "未知")")
-        LaunchLog.note("AppGroup 已停用 = \(AppGroup.isDisabled)")
-
-        _store = StateObject(wrappedValue: CardStore.shared)
-        _settings = StateObject(wrappedValue: AppSettings.shared)
-
-        // CardStore 里会再写一行「容器：…」，据此判断走到了哪一级降级。
-        LaunchLog.note("=== 初始化完成 ===")
-    }
-
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(store)
-                .environmentObject(settings)
-                .task {
-                    // 启动维护只跑一次。失败不阻断界面——用户至少要能看设置页
-                    // 去修配置，而不是对着白屏。
-                    await performStartupMaintenance()
-                }
-        }
-        .modelContainer(store.container)
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task { await performForegroundRefresh() }
-        }
-    }
-
-    // MARK: - 维护
-
-    /// 启动时：同步收藏状态、回填历史、刷新小组件缓存。
-    private func performStartupMaintenance() async {
-        do {
-            try store.syncFavoritesFromSharedState()
-        } catch {
-            store.reportError("同步收藏状态失败：\(AppFormat.message(for: error))")
-        }
-
-        await performForegroundRefresh()
-    }
-
-    /// 进入前台时：把时间推进造成的槽位变化补齐。
-    ///
-    /// 顺序有讲究——先 `backlogHistory`（按旧缓存推算已经过去的槽位，写进
-    /// 历史），再 `refreshRotationCache`（物化新缓存）。反过来会让刚过去的
-    /// 那个槽位被新缓存的口径覆盖掉，历史里就少一条。
-    private func performForegroundRefresh() async {
-        do {
-            try store.backlogHistory()
-        } catch {
-            store.reportError("回填历史失败：\(AppFormat.message(for: error))")
-        }
-
-        do {
-            try store.refreshRotationCache()
-        } catch {
-            store.reportError("刷新小组件缓存失败：\(AppFormat.message(for: error))")
+            AppRootView()
         }
     }
 

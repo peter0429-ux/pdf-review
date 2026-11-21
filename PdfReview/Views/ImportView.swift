@@ -294,8 +294,12 @@ struct ImportView: View {
             .fileImporter(
                 isPresented: $showPDFPicker,
                 // 只认 .pdf 时，有些来源（微信、部分网盘）会把 PDF 标成 public.data，
-                // 文件在选择器里是灰的。加 .item 兜底，选错了会在解析阶段提示「这不是 PDF」。
-                allowedContentTypes: [.pdf, .item],
+                // 文件在选择器里是灰的。加泛类型兜底，选错了会在解析阶段提示「这不是 PDF」。
+                //
+                // 同时放 .item 和 .data：`.item`（public.item）在 UIDocumentPicker 里有
+                // 「导致所有文件变灰」的已知坑，社区做法是改用 `.data`（public.data）。
+                // 两个都给，which one 生效都能放行。
+                allowedContentTypes: [.pdf, .item, .data],
                 allowsMultipleSelection: false
             ) { result in
                 switch result {

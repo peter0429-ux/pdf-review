@@ -13,17 +13,21 @@ enum AnalysisImporter {
 
     /// 导入流程允许的文件类型。
     ///
-    /// 为什么末尾必须有 `.item`：很多人从微信或 AirDrop 收到 `.json`，系统会给它打上
-    /// `public.data` 这类泛类型标记，而 `public.data` **不**满足 `public.json` 的约束——
-    /// 文件在选择器里就是灰的，点不动。加 `.item` 让任何文件都能被选中，选错类型的
-    /// 代价只是后面校验时报一句中文错误，比「文件明明在那儿却选不了」好得多。
+    /// 为什么末尾必须有 `.item` 和 `.data`：很多人从微信或 AirDrop 收到 `.json`，系统会
+    /// 给它打上 `public.data` 这类泛类型标记，而 `public.data` **不**满足 `public.json`
+    /// 的约束——文件在选择器里就是灰的，点不动。加泛类型让任何文件都能被选中，
+    /// 选错类型的代价只是后面校验时报一句中文错误，比「文件明明在那儿却选不了」好得多。
     ///
-    /// 为什么不再放 `UTType(filenameExtension: "pdfreview")`：这个扩展名没有在
-    /// Info.plist 里注册（本项目也没打算注册），`UTType(filenameExtension:)` 会返回一个
-    /// 动态标识符 `dyn.xxxxxxxx`。**动态类型放进 fileImporter 的过滤列表会让整个过滤失效**，
-    /// 连本该能选的 `.json` 也一起变灰——这正是用户反馈「没法选中这个文件」的根因。
+    /// 为什么同时放 `.item` 和 `.data`：`.item`（public.item）在 UIDocumentPicker 里有
+    /// 「导致所有文件变灰」的已知坑，社区通行做法是改用 `.data`（public.data）作为
+    /// 「允许任意文件」。两个都放， whichever 生效都放行。
+    ///
+    /// 为什么不放 `UTType(filenameExtension: "pdfreview")`：那个扩展名改由 Info.plist 的
+    /// `UTExportedTypeDeclarations` 注册为 `com.pdfreview.analysis`（见 PdfReview/Resources/
+    /// Info.plist），`UTType(filenameExtension:)` 在未注册时返回 `dyn.*` 动态标识符，
+    /// **动态类型放进 fileImporter 的过滤列表会让整个过滤失效**，连 `.json` 也一起灰。
     static var allowedContentTypes: [UTType] {
-        [.json, .item]
+        [.json, .item, .data]
     }
 
     /// 从用户选择的 URL 导入。已完成解码与校验。
