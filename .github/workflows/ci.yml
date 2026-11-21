@@ -29,6 +29,12 @@ jobs:
           echo "=== 格式标准三方一致性 ==="
           python scripts/check_format_consistency.py
 
+      # 检查器自己也要被检查：往临时副本里注入已知 bug，确认它真能报出来。
+      # 少了这一步，check_swift_consistency 哪天被改坏（或正则被改松）也不会有人发现，
+      # 只会表现为「一直绿」而 bug 照样流进 CI。
+      - name: 反向验证静态检查器
+        run: python scripts/verify_static_check.py
+
   # ------------------------------------------------------------------
   # 第二阶段：macOS 上真编译（这是本仓库 CI 的核心价值：
   # Windows 开发机上无法编译 Swift，这里补上）

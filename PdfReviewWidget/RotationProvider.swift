@@ -165,7 +165,9 @@ struct RotationProvider: TimelineProvider {
         let now = Date()
 
         // cache 不存在或卡片池为空：先给占位，15 分钟后再试。
-        guard let resolved = loadCache() else {
+        // 这里必须写全 `RotationProvider.loadCache()`：TimelineProvider 的方法
+        // 都是实例方法，而 loadCache 是 static，不能靠类型推断省掉前缀。
+        guard let resolved = RotationProvider.loadCache() else {
             let entry = RotationProvider.emptyEntry(now: now)
             let policy = TimelineReloadPolicy.after(now.addingTimeInterval(RotationProvider.retryInterval))
             completion(Timeline(entries: [entry], policy: policy))

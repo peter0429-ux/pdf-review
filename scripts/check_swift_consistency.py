@@ -170,6 +170,145 @@ def rel_posix(p: Path) -> str:
     return p.relative_to(ROOT).as_posix()
 
 
+# 实例成员（函数 / 属性）。用来消解「同名 static 与实例成员并存」的歧义。
+INSTANCE_MEMBER_RE = re.compile(
+    r"^[ \t]*"
+    r"(?:(?:@\w+(?:\([^)]*\))?|public|private|fileprivate|internal|open|final"
+    r"|nonisolated|mutating|override|convenience|required|lazy|weak|unowned"
+    r"|dynamic)\s+)*"
+    r"(?:var|let|func)\s+([A-Za-z_][A-Za-z0-9_]*)",
+    re.MULTILINE,
+)
+
+# 文件里声明的 static 成员（函数 / 属性）。
+STATIC_MEMBER_RE = re.compile(
+    r"^[ \t]*"
+    r"(?:(?:@\w+(?:\([^)]*\))?|public|private|fileprivate|internal|open|final"
+    r"|nonisolated|mutating|override)\s+)*"
+    r"static\s+(?:func|var|let)\s+([A-Za-z_][A-Za-z0-9_]*)",
+    re.MULTILINE,
+)
+
+# 函数 / init / subscript 声明。第二组捕获 "static"（可能为空）。
+FUNC_DECL_RE = re.compile(
+    r"^[ \t]*"
+    r"(?:(?:@\w+(?:\([^)]*\))?|public|private|fileprivate|internal|open|final"
+    r"|nonisolated|mutating|override|convenience|required)\s+)*"
+    r"(static\s+)?"
+    r"(func|init|subscript)\b",
+    re.MULTILINE,
+)
+
+
+def function_scopes(clean: str) -> list[tuple[int, int, bool]]:
+    """算出每个函数体的 [start, end] 与它是不是 static。
+
+    只处理同一文件内的函数。跨文件的同类 static 成员（写在 extension 里）
+    这个脚本看不出来 —— 宁可漏报，也不要造出一堆误报。
+
+    找函数体开括号的办法：从声明结束往后扫，只在括号深度 0 时认第一个
+    `{`。这样默认参数里的闭包（`f(x: { ... })`）不会把函数体起点找错。
+    """
+    scopes: list[tuple[int, int, bool]] = []
+
+    for m in FUNC_DECL_RE.finditer(clean):
+        is_static = m.group(1) is not None
+        i = m.end()
+        depth = 0
+        body_start = -1
+        while i < len(clean):
+            ch = clean[i]
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            elif ch == "{" and depth <= 0:
+                body_start = i
+                break
+            elif ch == ";" and depth <= 0:
+                break
+            i += 1
+        if body_start < 0:
+            continue
+
+        depth = 0
+        body_end = len(clean) - 1
+        i = body_start
+        while i < len(clean):
+            ch = clean[i]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    body_end = i
+                    break
+            i += 1
+        scopes.append((body_start, body_end, is_static))
+
+    return scopes
+
+
+def check_bare_static_calls(path: Path) -> list[str]:
+    """抓「实例方法里裸调本类型 static 成员」这一类编译错误。
+
+    为什么专门查这个：RotationProvider.getTimeline 是 TimelineProvider 的
+    实例方法，里面写了 `loadCache()` 而 loadCache 是 private static func，
+    swiftc 报 "static member 'loadCache' cannot be used on instance of type
+    'RotationProvider'"。这种错人眼扫几百行看不出来，却要耗掉一轮 CI。
+    """
+    clean = strip_noise(path.read_text(encoding="utf-8"))
+    statics = set(STATIC_MEMBER_RE.findall(clean))
+    if not statics:
+        return []
+
+    # 同名实例成员会赢：Swift 在实例方法里遇到 `model`，若既有 static let model
+    # 又有 @Published var model，解析到的是实例属性，不是 static。这种同名共存
+    # 在项目里真实存在（AppSettings.Keys.model 与 AppSettings.model），
+    # 不排除掉就会天天误报。
+    instance_members = set(INSTANCE_MEMBER_RE.findall(clean))
+    statics -= instance_members
+    if not statics:
+        return []
+
+    scopes = function_scopes(clean)
+    if not scopes:
+        return []
+
+    problems: list[str] = []
+    rel = rel_posix(path)
+
+    for name in sorted(statics):
+        # 裸调用：前面不是 `.`，也不是标识符的一部分。
+        pattern = re.compile(rf"(?<![A-Za-z0-9_.]){re.escape(name)}\b")
+        for m in pattern.finditer(clean):
+            offset = m.start()
+            if clean[m.end():m.end() + 1] not in ("(", "."):
+                continue
+            # 声明本身不算调用。
+            line_start = clean.rfind("\n", 0, offset) + 1
+            declaration_line = clean[line_start:offset]
+            if "func" in declaration_line or "static" in declaration_line:
+                continue
+
+            enclosing = [
+                is_static for (s, e, is_static) in scopes if s <= offset <= e
+            ]
+            if not enclosing:
+                continue              # 类型体层，或 static let 的初始化表达式
+            if all(enclosing):
+                continue              # 全在 static 上下文里，合法
+
+            line_no = clean.count("\n", 0, offset) + 1
+            problems.append(
+                f"[static 调用] {rel}:{line_no} 在实例方法里裸调用了 "
+                f"static 成员 {name}；必须写成 类型名.{name}，"
+                f"否则编译报 static member cannot be used on instance"
+            )
+
+    return problems
+
+
 def collect_targets() -> dict[str, list[Path]]:
     """按 generate_pbxproj.py 的同一套规则算出每个 target 编哪些文件。
 
@@ -283,8 +422,7 @@ def main() -> int:
         if not missing:
             passes.append(f"[{target}] 自有类型全部可见")
 
-    # ---- 3. 引用了项目里根本不存在的类型 ----
-    # 上一节只抓「定义过但没编进本 target」。这里抓「压根没定义」，
+    # ---- 3. 引用了项目里根本不存在的类型 ----    # 上一节只抓「定义过但没编进本 target」。这里抓「压根没定义」，
     # 典型是写完调用方忘了写实现（RootView 引用了但 RootView.swift 不存在）。
     # 靠 FRAMEWORK_TYPES 白名单压误报；漏收的框架类型会以「疑似」列出，
     # 由人扫一眼确认，不至于静默放过真正的缺失。
@@ -329,6 +467,18 @@ def main() -> int:
         )
     if not unbalanced:
         passes.append("全部文件花括号配平")
+
+    # ---- 4b. 实例方法里裸调 static 成员 ----
+    # 这一类错误在真机上没有任何症状，只有 swiftc 会报。本机不能编译，
+    # 所以只能在送 CI 之前用正则挡一道。
+    static_calls: list[str] = []
+    for p in sorted(set(targets["app"]) | set(targets["widget"])):
+        if p.exists():
+            static_calls.extend(check_bare_static_calls(p))
+    if static_calls:
+        problems.extend(static_calls)
+    else:
+        passes.append("无实例方法里裸调 static 成员")
 
     # ---- 5. 入口文件 ----
     app_rels = [rel_posix(p) for p in targets["app"] if p.exists()]
