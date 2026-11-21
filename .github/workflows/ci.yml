@@ -57,21 +57,23 @@ jobs:
             exit 1
           }
 
-      - name: 编译（App + Widget 两个 target）
+      - name: 编译（App + Widget 两个 target，真机 arm64 架构）
         run: |
           set -o pipefail
           # 用 -target 而不是 -scheme：scheme 需要 xcshareddata 里的共享
           # scheme 文件，本工程是脚本生成的，没有它。-target 直接命中 target。
-          # destination 用 generic：不依赖 runner 上恰好装了哪台模拟器。
-          # SYMROOT 以 build setting 形式传（-SYMROOT 不是合法命令行选项），
-          # 把产物固定到 ./build，方便后面打包 IPA。
+          # 用 -sdk iphoneos 出真机 arm64 架构（模拟器架构 Sideloadly 重签后
+          # 也装不上真机，这是上次「Unable to Install」的根因）。
+          # Release 配置：真机安装用 Release 更合适（无调试开销）。
+          # SYMROOT 以 build setting 形式传（-SYMROOT 不是合法命令行选项）。
           xcodebuild build \
             -project PdfReview.xcodeproj \
             -target PdfReview \
-            -sdk iphonesimulator \
-            -configuration Debug \
+            -sdk iphoneos \
+            -configuration Release \
             SYMROOT="$(pwd)/build" \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             OTHER_SWIFT_FLAGS='$(inherited) -warnings-as-errors' \
             2>&1 | tee build.log
         # 不加 xcpretty：runner 上不一定有，且它会吞掉原始错误行
