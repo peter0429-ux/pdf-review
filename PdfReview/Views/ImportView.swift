@@ -146,8 +146,10 @@ final class ImportSession: ObservableObject {
         analysisTask?.cancel()
         analysisTask = Task { [weak self] in
             // 进度回调从 AI actor 的上下文里来，必须跳回主线程再写 @Published。
-            let onProgress: @Sendable (Double) -> Void = { value in
-                Task { @MainActor [weak self] in
+            // 注意这里只捕获 self 引用本身，不捕获任何视图状态（那是并发违规）；
+            // self?.progress 的写入在 @MainActor 隔离的 Task 里完成。
+            let onProgress: @Sendable (Double) -> Void = { [weak self] value in
+                Task { @MainActor in
                     self?.progress = value
                 }
             }

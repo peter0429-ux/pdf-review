@@ -134,10 +134,10 @@ struct SettingsView: View {
             Text("改完间隔或张数后，桌面小组件会在几分钟内自动换到新节奏。")
         }
         .onChange(of: settings.rotationIntervalHours) { _, _ in
-            store.refreshRotationCache()
+            try? store.refreshRotationCache()
         }
         .onChange(of: settings.cardsPerSlot) { _, _ in
-            store.refreshRotationCache()
+            try? store.refreshRotationCache()
         }
     }
 
@@ -244,7 +244,7 @@ struct ExportListView: View {
         }
         .navigationTitle("导出与分享")
         .sheet(item: $sharingFile) { file in
-            ShareSheetView(url: file)
+            ShareSheetView(url: file.url)
         }
     }
 
