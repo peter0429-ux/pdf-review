@@ -293,7 +293,9 @@ struct ImportView: View {
             }
             .fileImporter(
                 isPresented: $showPDFPicker,
-                allowedContentTypes: [.pdf],
+                // 只认 .pdf 时，有些来源（微信、部分网盘）会把 PDF 标成 public.data，
+                // 文件在选择器里是灰的。加 .item 兜底，选错了会在解析阶段提示「这不是 PDF」。
+                allowedContentTypes: [.pdf, .item],
                 allowsMultipleSelection: false
             ) { result in
                 switch result {

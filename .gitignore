@@ -37,3 +37,7 @@ crash-logs/
 
 # 分析中间文件
 *.pdfreview.tmp
+
+# Python 缓存
+__pycache__/
+*.pyc

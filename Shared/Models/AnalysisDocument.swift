@@ -71,6 +71,7 @@ enum AnalysisValidator {
     enum ValidationError: Error, LocalizedError {
         case unreadableFile(String)
         case fileTooLarge(Int)
+        case notAJSONFile(String)
         case invalidJSON(String)
         case unsupportedVersion(String)
         case missingField(String)
@@ -93,6 +94,8 @@ enum AnalysisValidator {
             case let .fileTooLarge(bytes):
                 let mb = Double(bytes) / 1024 / 1024
                 return String(format: "文件过大（%.1f MB），上限为 8 MB。", mb)
+            case let .notAJSONFile(name):
+                return "「\(name)」不是分析文件。请选择扩展名为 .pdfreview.json 的文件（在「文件」App 里如果看不到扩展名，选那个图标是白色文档、体积几十 KB 的）。"
             case let .invalidJSON(detail):
                 return "JSON 格式有误：\(detail)"
             case let .unsupportedVersion(version):
@@ -273,9 +276,36 @@ extension AnalysisDocument {
             throw AnalysisValidator.ValidationError.fileTooLarge(data.count)
         }
 
+        // 选错文件时给一句人能看懂的话。放宽了选择器的类型过滤之后，用户可能选中
+        // PDF 或图片，若直接交给 JSONDecoder，报的会是「数据损坏」——听起来像文件坏了，
+        // 而实际只是选错了，完全误导。
+        guard Self.looksLikeJSON(data) else {
+            throw AnalysisValidator.ValidationError.notAJSONFile(url.lastPathComponent)
+        }
+
         let document = try decode(data)
         try AnalysisValidator.validate(document)
         return document
+    }
+
+    /// 粗判这份字节像不像 JSON：跳过 UTF-8 BOM 与前导空白，看第一个字符是不是 `{` 或 `[`。
+    /// 只是为了让报错更准确，真正的结构校验仍然交给 `decode` 与 `AnalysisValidator`。
+    static func looksLikeJSON(_ data: Data) -> Bool {
+        var bytes = data
+        if bytes.starts(with: [0xEF, 0xBB, 0xBF]) {
+            bytes = bytes.dropFirst(3)
+        }
+        for byte in bytes {
+            switch byte {
+            case 0x20, 0x09, 0x0A, 0x0D:  // 空格、制表、换行、回车
+                continue
+            case UInt8(ascii: "{"), UInt8(ascii: "["):
+                return true
+            default:
+                return false
+            }
+        }
+        return false
     }
 
     /// 从 Data 解码。把 DecodingError 翻译成可读中文。
