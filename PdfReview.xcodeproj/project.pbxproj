@@ -153,8 +153,10 @@
 		C64DCB59CA5A9C68D2803509 /* extract_pdf_text.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "extract_pdf_text.py"; sourceTree = "<group>"; };
 		B6C7353C0BDE953D76857A43 /* fetch_artifact.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "fetch_artifact.py"; sourceTree = "<group>"; };
 		ADA18F451EF8276025BD0754 /* generate_pbxproj.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "generate_pbxproj.py"; sourceTree = "<group>"; };
+		6B69879E737FCFFD5C5F9746 /* grep_binary.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "grep_binary.py"; sourceTree = "<group>"; };
 		80242B1E441114EC9284ACB4 /* pick_simulator.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "pick_simulator.py"; sourceTree = "<group>"; };
 		7FB41FDB3BBBD20606DD8058 /* probe_pdf.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "probe_pdf.py"; sourceTree = "<group>"; };
+		516A047B5551E669F62B8D2F /* verify_ipa.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "verify_ipa.py"; sourceTree = "<group>"; };
 		76C07943486488252C90FDFC /* verify_static_check.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "verify_static_check.py"; sourceTree = "<group>"; };
 		BDCFF6A7F6E4864A50849064 /* PdfReview.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PdfReview.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F948097A0B3D35815607F191 /* PdfReviewWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PdfReviewWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -390,8 +392,10 @@
 				C64DCB59CA5A9C68D2803509,
 				B6C7353C0BDE953D76857A43,
 				ADA18F451EF8276025BD0754,
+				6B69879E737FCFFD5C5F9746,
 				80242B1E441114EC9284ACB4,
 				7FB41FDB3BBBD20606DD8058,
+				516A047B5551E669F62B8D2F,
 				76C07943486488252C90FDFC,
 			);
 			name = "scripts";
