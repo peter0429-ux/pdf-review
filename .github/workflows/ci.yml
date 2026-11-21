@@ -123,3 +123,105 @@ jobs:
           name: PdfReview-unsigned-ipa
           path: PdfReview-unsigned.ipa
           retention-days: 30
+
+  # ------------------------------------------------------------------
+  # 第三阶段：模拟器启动冒烟（抓「一打开就闪退」这类运行时崩溃）
+  # 静态检查和编译都发现不了启动崩溃，必须真跑一次。
+  # ------------------------------------------------------------------
+  simulator-smoke:
+    needs: static-checks
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 选一台可用的 iPhone 模拟器
+        id: pick
+        run: |
+          set -euo pipefail
+          python scripts/generate_pbxproj.py
+          # 选设备的逻辑放在 scripts/pick_simulator.py 里：
+          # YAML 块里的内联 Python 一旦有引号嵌套就会报「YAML 解析失败」，
+          # 而且报错位置指向整个文件，排查成本极高。
+          DEVICE=$(python scripts/pick_simulator.py)
+          test -n "$DEVICE" || { echo "::error::没选出模拟器"; exit 1; }
+          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
+          echo "选中模拟器：$DEVICE"
+
+      - name: 编译模拟器版
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project PdfReview.xcodeproj \
+            -target PdfReview \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            SYMROOT="$(pwd)/sim" \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee sim-build.log
+
+      - name: 安装并启动，检查是否闪退
+        run: |
+          set -uo pipefail
+          DEVICE="${{ steps.pick.outputs.device }}"
+          xcrun simctl boot "$DEVICE" 2>/dev/null || true
+          xcrun simctl bootstatus "$DEVICE" -b
+          APP=$(find sim -type d -name "PdfReview.app" | head -1)
+          test -n "$APP" || { echo "::error::找不到 PdfReview.app"; exit 1; }
+
+          echo "安装 $APP"
+          xcrun simctl install "$DEVICE" "$APP"
+
+          # simctl launch 成功时输出 "<bundle-id>: <pid>"，这个 PID 是判断
+          # 「有没有闪退」最直接的依据：进程没了说明它自己退出了。
+          echo "启动 com.pdfreview.app"
+          LAUNCH=$(xcrun simctl launch "$DEVICE" com.pdfreview.app 2>&1) || true
+          echo "$LAUNCH"
+          PID=$(echo "$LAUNCH" | sed -n 's/.*: \([0-9][0-9]*\)$/\1/p' | head -1)
+
+          if [ -z "$PID" ]; then
+            echo "::error::simctl launch 没有返回 PID，启动就失败了"
+            ALIVE=0
+          else
+            echo "PID=$PID"
+            # 给启动留足时间：SwiftData 建库 + 首次维护都在这个时候
+            sleep 12
+            if kill -0 "$PID" 2>/dev/null; then
+              echo "PID $PID 仍在运行：没有闪退"
+              ALIVE=1
+            else
+              echo "PID $PID 已消失：疑似启动崩溃"
+              ALIVE=0
+            fi
+          fi
+
+          echo "=== 崩溃报告 ==="
+          mkdir -p crash-logs
+          cp -R ~/Library/Logs/DiagnosticReports/. crash-logs/ 2>/dev/null || true
+          ls -la crash-logs 2>/dev/null | head -20 || true
+
+          # App 自己的日志（SwiftData 建库报错、LaunchServices 拒启动都在这）
+          echo "=== 最近的 App 相关系统日志 ==="
+          xcrun simctl spawn "$DEVICE" log show \
+            --last 3m \
+            --predicate 'processImagePath CONTAINS "PdfReview" OR eventMessage CONTAINS "PdfReview" OR eventMessage CONTAINS "ModelContainer"' \
+            --style compact 2>/dev/null | tail -150 || true
+
+          if [ "$ALIVE" != "1" ]; then
+            echo "::error::模拟器里 App 启动后进程消失，见日志与 crash-logs"
+            exit 1
+          fi
+
+      - name: 上传崩溃日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-crash-logs
+          path: |
+            crash-logs/
+            sim-build.log
+          retention-days: 14
+          if-no-files-found: ignore

@@ -40,36 +40,52 @@ final class CardStore: ObservableObject {
     // MARK: 初始化
 
     init() {
+        let schema = Schema([
+            ReviewDeck.self,
+            ReviewCard.self,
+            CardDisplayRecord.self
+        ])
+
+        // 三级降级，目标是「无论签名环境如何，App 都能启动」：
+        //  1. App Group 容器可用 → 用共享容器，小组件能读到同一份数据（正式形态）
+        //  2. 容器不可用（典型场景：用免费 Apple ID 侧载，provisioning profile
+        //     里没有 App Groups 能力，系统不会给容器）→ 退回 App 自己的本地
+        //     存储。数据照常持久化，只是小组件读不到。
+        //  3. 连本地存储都建不起来 → 内存模式，至少不至于白屏。
+        if AppGroup.isContainerAvailable {
+            do {
+                let configuration = ModelConfiguration(
+                    schema: schema,
+                    isStoredInMemoryOnly: false,
+                    allowsSave: true,
+                    groupContainer: .identifier(AppGroup.identifier)
+                )
+                container = try ModelContainer(for: schema, configurations: [configuration])
+                return
+            } catch {
+                lastError = "共享数据容器创建失败，已退回本地存储：\(error.localizedDescription)"
+            }
+        }
+
         do {
-            let schema = Schema([
-                ReviewDeck.self,
-                ReviewCard.self,
-                CardDisplayRecord.self
-            ])
             let configuration = ModelConfiguration(
                 schema: schema,
                 isStoredInMemoryOnly: false,
-                allowsSave: true,
-                groupContainer: .identifier(AppGroup.identifier)
-            )
-            container = try ModelContainer(for: schema, configurations: [configuration])
-        } catch {
-            // 容器创建失败时退回内存存储，保证 App 不崩溃；
-            // 此时数据不持久化，设置页会提示用户。
-            self.lastError = "数据容器创建失败，已切换到临时存储：\(error.localizedDescription)"
-            let schema = Schema([
-                ReviewDeck.self,
-                ReviewCard.self,
-                CardDisplayRecord.self
-            ])
-            let configuration = ModelConfiguration(
-                schema: schema,
-                isStoredInMemoryOnly: true,
                 allowsSave: true
             )
-            // 内存容器在正常情况下不会失败；若仍失败则问题严重到无法运行。
-            container = try! ModelContainer(for: schema, configurations: [configuration])
+            container = try ModelContainer(for: schema, configurations: [configuration])
+            return
+        } catch {
+            lastError = "本地数据容器创建失败，已切换到临时存储：\(error.localizedDescription)"
         }
+
+        let configuration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: true,
+            allowsSave: true
+        )
+        // 内存容器在正常情况下不会失败；若仍失败则问题严重到无法运行。
+        container = try! ModelContainer(for: schema, configurations: [configuration])
     }
 
     // MARK: 查询

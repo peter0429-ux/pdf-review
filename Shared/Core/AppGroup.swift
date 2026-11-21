@@ -37,11 +37,28 @@ enum AppGroup {
         containerURL.appendingPathComponent("rotation-cache.json", isDirectory: false)
     }
 
-    /// 共享容器是否可用（用于在设置页给出提示）。
+    /// 共享容器是否可用（用于在设置页给出提示，也用于决定要不要建
+    /// groupContainer 的 ModelContainer）。
+    ///
+    /// 不能只判断 `containerURL(...) != nil`：用免费 Apple ID 侧载时
+    /// provisioning profile 里没有 App Groups 能力，系统有可能给出一个
+    /// URL，但那个目录不可写。真正写一个探测文件才知道能不能用——
+    /// 这一步必须做，因为拿不可写的容器去建 SwiftData 容器会直接崩，
+    /// 而不是抛个能 catch 的错误。
     static var isContainerAvailable: Bool {
-        FileManager.default.containerURL(
+        guard let url = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: identifier
-        ) != nil
+        ) else {
+            return false
+        }
+        let probe = url.appendingPathComponent(".probe-\(UUID().uuidString)")
+        do {
+            try Data("ok".utf8).write(to: probe, options: .atomic)
+            try? FileManager.default.removeItem(at: probe)
+            return true
+        } catch {
+            return false
+        }
     }
 }
 

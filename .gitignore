@@ -30,5 +30,10 @@ Secrets.plist
 tmp/
 *.log
 
+# 构建与交付产物（IPA、解包出来的 .app、下载的 artifact 都不该进仓库）
+outputs/
+sim/
+crash-logs/
+
 # 分析中间文件
 *.pdfreview.tmp
