@@ -1,0 +1,232 @@
+{
+  "schemaVersion": "1.0",
+  "generator": "PdfReview/1.0",
+  "generatedAt": "2026-11-22T02:00:00+08:00",
+  "source": {
+    "fileName": "iOS内存管理.pdf",
+    "pageCount": 12
+  },
+  "deck": {
+    "title": "iOS 内存管理",
+    "summary": "随 App 内置的示例牌组，共 24 张。覆盖 ARC 引用计数、循环引用、weak/unowned 选择、autoreleasepool、写时复制、内存警告与泄漏排查。没有导入自己的 PDF 时，App 与桌面小组件显示的就是这一套。",
+    "language": "zh-Hans"
+  },
+  "cards": [
+    {
+      "question": "ARC 在编译期做了什么，运行期又由谁负责释放对象？",
+      "answer": "ARC 是编译器特性：编译期在合适位置插入 retain/release/autorelease 调用，运行期由这些调用维护引用计数，计数归零时对象调用 deinit 并释放内存。ARC 不改变引用计数的语义，只是免去手写。",
+      "detail": "可在 Build Settings 的 Objective-C Automatic Reference Counting 确认开关状态；Swift 没有 non-ARC 模式。",
+      "tags": ["ARC", "引用计数", "基础"],
+      "sourcePage": 1,
+      "difficulty": 2,
+      "importance": 5
+    },
+    {
+      "question": "强引用循环是怎么产生的？给出一个典型例子。",
+      "answer": "两个对象互相持有强引用，各自引用计数都不会归零。典型例子：父子关系里父对象强引用子对象，子对象又用强引用指回父对象；或者闭包捕获了持有该闭包的对象（self 强捕获）。",
+      "detail": "self.handler = { self.doSomething() } 会让 self 与闭包互相持有。",
+      "tags": ["循环引用", "内存泄漏"],
+      "sourcePage": 3,
+      "difficulty": 3,
+      "importance": 5
+    },
+    {
+      "question": "weak 与 unowned 的区别是什么，什么时候该用哪个？",
+      "answer": "weak 不增加引用计数，被引用对象释放后自动置为 nil，因此必须是可选类型；unowned 也不增加引用计数，但对象释放后不会置 nil，访问已释放的 unowned 引用会崩溃。生命周期短于持有者、可能为空的用 weak；生命周期一定不短于持有者的用 unowned。",
+      "detail": "delegate 通常用 weak；同一聚合体内父对子的反向引用若确定不会被单独释放，可用 unowned。",
+      "tags": ["weak", "unowned", "引用语义"],
+      "sourcePage": 4,
+      "difficulty": 3,
+      "importance": 5
+    },
+    {
+      "question": "闭包捕获列表中 [weak self] 与 [unowned self] 的写法与风险分别是什么？",
+      "answer": "[weak self] 需要在闭包内 if let self 或 self?. 解包，安全但多一层可选判断；[unowned self] 可直接用 self，但闭包执行时若 self 已释放会崩溃。异步、长生命周期或可能悬空的闭包用 [weak self]。",
+      "detail": "[weak self] in guard let self else { return } 是常见写法（Swift 5.7+ 可省略 self）。",
+      "tags": ["闭包", "weak", "捕获列表"],
+      "sourcePage": 5,
+      "difficulty": 3,
+      "importance": 4
+    },
+    {
+      "question": "autoreleasepool 的作用是什么，什么场景下需要手写？",
+      "answer": "autoreleasepool 把 autorelease 对象延迟到池排空时释放，避免临时对象堆积。主线程每个 runloop 迭代自动有池；在循环里大量创建临时对象、或自己创建的线程里，应显式写 autoreleasepool { } 让每轮及时回收。",
+      "detail": "自己创建的 Thread/OperationQueue 任务不会自动建池，需要手动包一层。",
+      "tags": ["autoreleasepool", "生命周期"],
+      "sourcePage": 6,
+      "difficulty": 4,
+      "importance": 3
+    },
+    {
+      "question": "值类型与引用类型在内存上的差别是什么？String 是值类型，为什么改它不一定复制？",
+      "answer": "值类型（struct/enum）赋值时语义上复制，通常分配在栈上或内联；引用类型（class）赋值只复制指针，实例在堆上。Swift 的 String、Array 用写时复制（COW）：多个变量共享同一份存储，直到某一方要修改时才真正复制。",
+      "detail": "COW 靠 isKnownUniquelyReferenced 判断存储是否唯一；自定义 COW 结构体要用这个函数。",
+      "tags": ["值类型", "写时复制", "内存布局"],
+      "sourcePage": 7,
+      "difficulty": 4,
+      "importance": 3
+    },
+    {
+      "question": "收到内存警告时应该做什么？memoryWarning 与 didReceiveMemoryWarning 的区别？",
+      "answer": "内存警告到来时应释放可重建的缓存：清空图片缓存、丢弃可重算的数据、暂停后台任务。UIKit 会调用 UIViewController 的 didReceiveMemoryWarning()（iOS 6 起不再自动 purge view）；SwiftUI 里监听 UIApplication.didReceiveMemoryWarningNotification 或使用 onReceive。崩溃风险高时应降低常驻数据量。",
+      "detail": "不要把清理逻辑写成阻塞主线程的大循环；清理完最好留出可重建入口。",
+      "tags": ["内存警告", "UIKit", "SwiftUI"],
+      "sourcePage": 9,
+      "difficulty": 3,
+      "importance": 4
+    },
+    {
+      "question": "用 Instruments 定位内存泄漏的标准流程是什么？",
+      "answer": "用 Debug Memory Graph 先看对象图找可疑强引用环；再用 Leaks 模板跑一遍确认泄漏类型；用 Allocations 观察增长曲线，配合 Generation Analysis 定位增长点；必要时用 VM Tracker 区分匿名内存与脏页。定位后回到代码修正持有关系，再复测确认泄漏消失。",
+      "detail": "Memory Graph 里紫色叹号表示被泄漏对象，右侧可看完整的引用链。",
+      "tags": ["Instruments", "排查", "工具"],
+      "sourcePage": 11,
+      "difficulty": 4,
+      "importance": 4
+    },
+    {
+      "question": "deinit 一定会在对象释放时被调用吗？deinit 里为什么不能安全地使用 self 做异步操作？",
+      "answer": "deinit 只在引用计数归零、对象即将释放时调用一次。deinit 执行期间对象已处于销毁过程，不能再把 self 交给异步任务或逃逸闭包——那时对象随时可能被回收，捕获的 self 会变成悬空引用。deinit 里应只做同步、不逃逸的清理。",
+      "detail": "deinit 不保证在主线程调用；在里面碰 UI 或需要主线程的资源是错误的。用一个专门的 cleanup 方法在生命周期明确的地方调用，比依赖 deinit 更可控。",
+      "tags": ["deinit", "生命周期"],
+      "sourcePage": 2,
+      "difficulty": 3,
+      "importance": 4
+    },
+    {
+      "question": "unowned(unsafe) 与 unowned 有什么不同？什么情况下会用到它？",
+      "answer": "unowned 是安全版本：对象释放后引用指向一个占位，访问会以可预期的方式崩溃（fatal error）。unowned(unsafe) 关掉这层检查，直接保存原始指针，对象释放后访问是未定义行为——可能读到垃圾数据而不崩。只有在对性能极度敏感、且能证明生命周期绝对安全时才考虑，日常代码不该用。",
+      "detail": "unowned(unsafe) 常用于某些桥接 C API 的场景；Swift 标准库与系统框架内部偶有用到。",
+      "tags": ["unowned", "未定义行为", "引用语义"],
+      "sourcePage": 4,
+      "difficulty": 5,
+      "importance": 2
+    },
+    {
+      "question": "weak 引用是怎么实现的？为什么 weak 变量在对象释放后会自动变 nil？",
+      "answer": "运行期维护一张 side table，里面记录指向该对象的全部 weak 引用地址。对象释放时，运行时遍历这张表，把每个 weak 变量的存储槽清零，所以读出来是 nil。正因为要维护这张表，weak 的读写都比强引用慢，且 weak 变量必须可选。",
+      "detail": "这也是「weak 引用不阻止 deinit」的原因：side table 里的条目不算引用计数。",
+      "tags": ["weak", "运行时", "side table"],
+      "sourcePage": 4,
+      "difficulty": 4,
+      "importance": 3
+    },
+    {
+      "question": "什么是 Zombie Object（僵尸对象），开启它有什么代价？",
+      "answer": "开启 NSZombieEnabled 后，对象释放时不会真正回收内存，而是被标记成僵尸对象。之后再向它发消息，会立刻报错并打印出是哪个对象、哪个方法——把「访问已释放对象」这种偶发崩溃变成可定位的确定崩溃。代价是内存占用大幅上升，只适合在调试期短时间开启。",
+      "detail": "在 Xcode 的 Scheme → Run → Diagnostics 里勾选 Zombie Objects，不要用代码手动设环境变量。",
+      "tags": ["僵尸对象", "调试", "崩溃排查"],
+      "sourcePage": 10,
+      "difficulty": 3,
+      "importance": 3
+    },
+    {
+      "question": "Tagged Pointer 是什么？它能节省什么？",
+      "answer": "对足够小的值（如小整数、短字符串、部分 NSNumber/NSDate），系统不分配堆对象，而是把值直接编码进指针本身（高位打标记）。这样省掉一次内存分配和引用计数操作，也省掉对象头。对大量小对象（循环里创建 NSNumber）性能提升明显。",
+      "detail": "因为不是真对象，对它调 retain/release 会被忽略；也不要假设 isa 指针存在。",
+      "tags": ["Tagged Pointer", "性能", "内存布局"],
+      "sourcePage": 7,
+      "difficulty": 4,
+      "importance": 2
+    },
+    {
+      "question": "Swift 的 struct 为什么有时比成员大小之和更大？用什么工具能看出来？",
+      "answer": "内存对齐要求每个成员的偏移是其对齐值的倍数，编译器会在成员之间插入填充字节。所以 struct 的实际大小可能大于各成员之和。用 MemoryLayout<T>.size（有效字节）、.stride（含尾部填充、数组元素间距）、.alignment 三个值能看清楚。把大对齐成员放前面通常能减少填充。",
+      "detail": "MemoryLayout 是编译期常量，没有运行时代价，适合在断言里使用。",
+      "tags": ["内存对齐", "MemoryLayout", "性能"],
+      "sourcePage": 7,
+      "difficulty": 4,
+      "importance": 2
+    },
+    {
+      "question": "SwiftUI 里 @StateObject 与 @ObservedObject 用错会怎样？",
+      "answer": "@StateObject 由视图持有对象，视图销毁前对象不会重建；@ObservedObject 只是引用外部对象，视图重建时若传入的是新建实例，对象会被重新创建、状态丢失，看起来像「数据莫名被重置」。需要视图自己持有并管理生命周期时用 @StateObject，父视图把已有对象传下来时用 @ObservedObject。",
+      "detail": "同理 @State 用于值类型、@Binding 用于外部状态。把 @StateObject 写成 @ObservedObject 是 SwiftUI 里最常见的状态 bug 之一。",
+      "tags": ["SwiftUI", "状态管理", "生命周期"],
+      "sourcePage": 8,
+      "difficulty": 4,
+      "importance": 5
+    },
+    {
+      "question": "Combine 里 AnyCancellable 不保存会怎样？",
+      "answer": "sink/assign 返回的 AnyCancellable 一旦被释放，订阅立刻取消，回调再也不会触发。所以必须把它存进实例属性（或 Set<AnyCancellable>）。常见现象是「数据明明变了但界面不动」，其实是订阅在第一行执行完就被回收了。",
+      "detail": "store(in: &cancellables) 是标准写法；临时订阅才考虑 .store(in:) 到局部变量并接受它随作用域结束。",
+      "tags": ["Combine", "AnyCancellable", "订阅"],
+      "sourcePage": 8,
+      "difficulty": 3,
+      "importance": 4
+    },
+    {
+      "question": "Timer 与 NotificationCenter 为什么容易造成泄漏？正确做法是什么？",
+      "answer": "scheduledTimer 的 target 会被强引用，控制器若同时持有 timer，就形成环；NotificationCenter.addObserver(self, selector:) 也是强引用观察者。解法：timer 用闭包版本（iOS 10+ 的 block API）并在 deinit/onDisappear 里 invalidate；通知用闭包观察者并把返回的 token 保存好、在适当时机移除。",
+      "detail": "SwiftUI 里优先用 .onReceive(publisher)，视图消失时订阅会自动解除。",
+      "tags": ["Timer", "NotificationCenter", "内存泄漏"],
+      "sourcePage": 9,
+      "difficulty": 3,
+      "importance": 4
+    },
+    {
+      "question": "iOS 上「脏内存」「压缩内存」「交换」分别是什么关系？",
+      "answer": "脏内存（dirty memory）是本进程写过、不能被系统直接丢弃的页；干净内存（如只读的代码段）可随时回收。内存吃紧时系统会压缩部分内存（compressed memory），把不活跃的页压缩存储，需要时再解压——这本质是拿 CPU 换内存。iOS 没有传统意义的 swap 分区，压缩 + 杀进程就是它的「换页」策略。",
+      "detail": "所以在 iOS 上内存吃紧的最终结果是 jetsam 直接杀掉后台进程，而不是卡顿。",
+      "tags": ["脏内存", "压缩内存", "系统机制"],
+      "sourcePage": 12,
+      "difficulty": 5,
+      "importance": 3
+    },
+    {
+      "question": "memory footprint 超过多少会被系统杀掉？为什么这个阈值不固定？",
+      "answer": "没有统一数字。系统按设备总内存、当前整体压力、App 是前台还是后台动态决定 jetsam 阈值。同一台设备上，前台 App 能用的额度远大于后台；低端机额度小。能查到的历史经验值只能当参考，不能当承诺。判断标准应是「主动把常驻内存压到尽可能低」，而不是卡某个具体 MB 数。",
+      "detail": "可以用 os_proc_available_memory() 查当前进程还有多少可用额度（iOS 13+）。",
+      "tags": ["jetsam", "内存阈值", "系统机制"],
+      "sourcePage": 12,
+      "difficulty": 4,
+      "importance": 4
+    },
+    {
+      "question": "加载一张 4000×3000 的图片，实际占多少内存？为什么比文件大小大很多？",
+      "answer": "解码后占 4000 × 3000 × 4 字节 ≈ 45.8 MB（每像素 4 字节 RGBA）。文件大小只反映压缩后的数据量，一旦解码成位图，占用按像素数算。所以「一个 2MB 的 JPEG 吃掉 46MB 内存」完全正常，这也是列表里放多张大图最容易 OOM 的原因。",
+      "detail": "用 UIGraphicsImageRenderer 或 CGImageSourceCreateThumbnailAtIndex 按显示尺寸降采样，别把原图整张解码。",
+      "tags": ["图片内存", "降采样", "OOM"],
+      "sourcePage": 9,
+      "difficulty": 3,
+      "importance": 5
+    },
+    {
+      "question": "循环里处理大量图片时，为什么要用 autoreleasepool 包起来？",
+      "answer": "每次解码/缩放产生的临时对象（UIImage、CGImage、中间位图）会在 autoreleasepool 排空时才释放。主线程的池要等 runloop 迭代结束才排空，一个同步的大循环跑完之前，所有临时对象会同时堆在内存里，很容易触发 OOM。把每轮循环包进 autoreleasepool { } 就能让临时对象及时释放，峰值内存从「总和」降到「单张」。",
+      "detail": "这类问题在「批量压缩图片」「批量导入文件」时最典型，改完峰值往往降一个数量级。",
+      "tags": ["autoreleasepool", "批量处理", "峰值内存"],
+      "sourcePage": 6,
+      "difficulty": 4,
+      "importance": 4
+    },
+    {
+      "question": "Memory Graph 里只看到「Malloc 48 Bytes」，怎么定位到真实类型？",
+      "answer": "48 字节这类匿名分配看不出类型，需要结合上下文：看它的引用链是谁持有（右侧箭头），顺着找到业务对象；或者打开 Malloc Scribble / Malloc Stack Logging，前者把新分配填成固定字节便于分辨，后者记录每条分配的调用栈，点进去就能看到是哪一行代码分配的。",
+      "detail": "Malloc Stack Logging 会让内存占用和运行速度都变差，只适合复现阶段短时间开启。",
+      "tags": ["Memory Graph", "排查", "工具"],
+      "sourcePage": 11,
+      "difficulty": 4,
+      "importance": 3
+    },
+    {
+      "question": "结构体里的闭包为什么会「捕获 self」？struct 本身是值类型，怎么会有循环引用？",
+      "answer": "struct 自己不会被循环引用，但闭包捕获的是外部对象（通常是持有这个 struct 的 class，或 struct 里存的 class 引用）。真正形成环的是「class A 持有闭包 → 闭包捕获 A」。所以判断标准不是「谁捕获谁」，而是沿着强引用链条找闭合回路。",
+      "detail": "值类型嵌套值类型永远不构成环；只要链路中出现 class 或闭包捕获，才可能出现环。",
+      "tags": ["值类型", "闭包", "循环引用"],
+      "sourcePage": 3,
+      "difficulty": 4,
+      "importance": 3
+    },
+    {
+      "question": "内存泄漏能靠自动化测试或 CI 发现吗？能做到什么程度？",
+      "answer": "能做到一部分：单元测试里可以用 weak 变量断言对象在作用域结束后被释放（XCTAssertNil(weakRef)），这能抓住大部分「忘记置 nil」的环；Leaks 模板可以用 xcodebuild test 配合 xctrace 跑，但结果不稳定、容易误报，通常只做趋势观察。真正复杂的泄漏仍要靠人工 Memory Graph 排查。",
+      "detail": "最实用的自动化是「关键对象的弱引用断言」，成本低、误报为零，适合放进 CI。",
+      "tags": ["自动化测试", "CI", "排查"],
+      "sourcePage": 11,
+      "difficulty": 4,
+      "importance": 3
+    }
+  ]
+}

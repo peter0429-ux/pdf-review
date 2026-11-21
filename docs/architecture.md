@@ -263,11 +263,16 @@ App Groups 要求 provisioning profile 绑定**明确的 App ID** 并登记该 g
 
 | 环节 | 落点 | 说明 |
 |---|---|---|
-| 种子源 | `PdfReview/Resources/seed-analysis.pdfreview.json` | 与用户手动导入的格式完全相同，走同一套 `AnalysisDocument` + `AnalysisValidator` |
-| 生成小组件缓存 | `PdfReviewWidget/Resources/rotation-cache.json` | 由 `scripts/build_seed_cache.py` 从上面那份生成，**同一份内容两种编码** |
+| 种子源 | `PdfReview/Resources/bundled-deck.pdfreview.json` | 与用户手动导入的格式完全相同，走同一套 `AnalysisDocument` + `AnalysisValidator` |
+| 生成小组件缓存 | `PdfReviewWidget/Resources/bundled-wheel.json` | 由 `scripts/build_seed_cache.py` 从上面那份生成，**同一份内容两种编码** |
 | Widget 读取 | `RotationCache.resolve(bundle:)` | 三级：共享容器 → 本进程容器里的副本 → 内置种子 |
 | Widget 写入 | `RotationCache.seedOwnContainerIfNeeded(bundle:)` | 读到种子后复制进自己容器，否则 `NextCardIntent` 的写盘无处落地 |
 | App 读取 | `CardStore.importSeedDeckIfNeeded(bundle:)` | 首次启动导入成一幅 `ReviewDeck`，用 `SharedKeys.seedImported` 保证只导一次 |
+
+**命名要分清**：`bundled-wheel.json` 是随包发布的**只读副本**；
+`rotation-cache.json` 是 App 运行时写进 App Group 容器的**可变缓存**
+（见 §4.2 与 `AppGroup.cacheFileURL`）。两者格式相同但生命周期不同，
+不要混用同一个名字，否则排查「读到的到底是包里的还是刚写的」会很费劲。
 
 两条必须守住的性质：
 
@@ -293,8 +298,8 @@ schema/  samples/  scripts/
 两个种子资源分属不同 target，不能合并成一个：
 
 ```
-PdfReview/Resources/seed-analysis.pdfreview.json         → App target Resources
-PdfReviewWidget/Resources/rotation-cache.json            → Widget target Resources
+PdfReview/Resources/bundled-deck.pdfreview.json         → App target Resources
+PdfReviewWidget/Resources/bundled-wheel.json            → Widget target Resources
 ```
 
 它们**不是**同一份文件的副本：前者是 `AnalysisDocument`（`cards` 用

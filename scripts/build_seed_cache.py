@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""把 .pdfreview.json 分析文件转成小组件用的 rotation-cache.json。
+"""把 .pdfreview.json 分析文件转成小组件用的内置轮换缓存。
 
 为什么需要这个脚本
 ==================
 App 与小组件需要**两种不同格式**的同一批卡片：
 
   - App 读 ``AnalysisDocument`` 格式（.pdfreview.json），用于导入 SwiftData
-  - 小组件读 ``RotationCache`` 格式（rotation-cache.json），直接渲染
+  - 小组件读 ``RotationCache`` 格式，直接渲染
 
 两者字段集不同：RotationCache 多了 deckID / deckTitle / isFavorite，
 少了 difficulty / importance（小组件不显示）。手工维护两份必然分叉，
 所以只保留一份源数据，另一份由本脚本生成。
+
+产出的文件名是 ``bundled-wheel.json``，不是 ``rotation-cache.json``：
+后者是 App 运行时写进 App Group 容器的**可变缓存**的文件名，两者格式
+相同但生命周期完全不同。名字分开，排查问题时才不会弄混。
 
 UUID 必须稳定
 =============
@@ -29,8 +33,8 @@ epoch 固定，小组件在任何设备、任何安装时间算出的 slot 都�
 ====
     python scripts/build_seed_cache.py
 
-输入：PdfReview/Resources/seed-analysis.pdfreview.json
-输出：PdfReviewWidget/Resources/rotation-cache.json
+输入：PdfReview/Resources/bundled-deck.pdfreview.json
+输出：PdfReviewWidget/Resources/bundled-wheel.json
 """
 
 import hashlib
@@ -41,13 +45,13 @@ import uuid
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-SOURCE = os.path.join(ROOT, "PdfReview", "Resources", "seed-analysis.pdfreview.json")
-TARGET = os.path.join(ROOT, "PdfReviewWidget", "Resources", "rotation-cache.json")
+SOURCE = os.path.join(ROOT, "PdfReview", "Resources", "bundled-deck.pdfreview.json")
+TARGET = os.path.join(ROOT, "PdfReviewWidget", "Resources", "bundled-wheel.json")
 
 # 固定的轮换锚点。改这个值等于让所有设备上的轮换位置整体平移，不要随意改。
 EPOCH = "2026-01-01T00:00:00Z"
 # 固定的洗牌盐。改它就等于重新洗一遍牌。
-ORDER_SALT = "seed-electronics-v1"
+ORDER_SALT = "bundled-basics-v1"
 # 轮换周期（小时）。用户可在 App 里改，这里只是初始值。
 INTERVAL_HOURS = 3
 # 每轮显示几张。

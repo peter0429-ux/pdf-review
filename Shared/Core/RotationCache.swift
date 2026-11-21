@@ -139,8 +139,12 @@ struct RotationCache: Codable {
     // （不同沙盒）。唯一能让 Widget 一装上就有内容的办法，是把一份数据打进
     // Widget 自己的 bundle 资源里，由它复制到自己的沙盒后再读。
 
-    /// 内置种子文件名。`PdfReviewWidget/Resources/rotation-cache.json`。
-    static let bundledSeedName = "rotation-cache"
+    /// 内置种子文件名。`PdfReviewWidget/Resources/bundled-wheel.json`。
+    ///
+    /// 刻意不叫 `rotation-cache`：那个名字是**运行时缓存**（App Group 容器里）
+    /// 的固定文件名，两者混用会让「读的是包里的种子还是 App 刚写的缓存」
+    /// 变得看不出来。种子是随包发布的只读内容，缓存是运行时产物。
+    static let bundledSeedName = "bundled-wheel"
 
     /// 从**当前进程**的 bundle 读内置种子。
     ///

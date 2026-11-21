@@ -97,10 +97,10 @@ def check_seeds(app: Path) -> list[str]:
     problems: list[str] = []
 
     print()
-    print("=== 种子资源是否真的打进包里 ===")
+    print("=== 内置种子资源是否真的打进包里 ===")
 
-    widget_seed = app / "PlugIns" / "PdfReviewWidget.appex" / "rotation-cache.json"
-    app_seed = app / "seed-analysis.pdfreview.json"
+    widget_seed = app / "PlugIns" / "PdfReviewWidget.appex" / "bundled-wheel.json"
+    app_seed = app / "bundled-deck.pdfreview.json"
 
     for path, label in [(widget_seed, "小组件种子"), (app_seed, "App 种子")]:
         if path.exists():

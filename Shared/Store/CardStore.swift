@@ -390,11 +390,11 @@ extension CardStore {
         // 情况仍有重试机会——所以这个提前量只用来兜「崩掉」这一种。
         flags.set(true, forKey: SharedKeys.seedImported)
 
-        // 注意资源名与扩展名的切分：文件名是 seed-analysis.pdfreview.json，
+        // 注意资源名与扩展名的切分：文件名是 bundled-deck.pdfreview.json，
         // 真正的扩展名只有最后一段 "json"。写成 withExtension: "pdfreview.json"
         // 依赖 Foundation 把两段拼在一起，能跑但不该依赖。
-        guard let url = bundle.url(forResource: "seed-analysis.pdfreview", withExtension: "json") else {
-            LaunchLog.note("种子：bundle 里找不到 seed-analysis.pdfreview.json")
+        guard let url = bundle.url(forResource: "bundled-deck.pdfreview", withExtension: "json") else {
+            LaunchLog.note("种子：bundle 里找不到 bundled-deck.pdfreview.json")
             flags.set(false, forKey: SharedKeys.seedImported)
             return nil
         }

@@ -191,10 +191,9 @@ struct SettingsView: View {
                 .font(.footnote)
             }
             LabeledContent("内置内容") {
-                Text(UserDefaults.standard.bool(forKey: SharedKeys.seedImported)
-                     ? "已导入（内置示例牌组）"
-                     : "尚未导入")
+                Text(bundledDeckStatus)
                     .font(.footnote)
+                    .multilineTextAlignment(.trailing)
             }
         } header: {
             Text("关于")
@@ -205,8 +204,22 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: Toast
+    /// 内置牌组的真实状态。
+    ///
+    /// 早先这里是硬编码的一句「已导入（某套牌组）」。内置内容一换，那句话
+    /// 就成了假话——而且用户没法从界面判断到底是哪一套在跑。现在从现实
+    /// 数据里取：先看标记，再看缓存里真实的牌组名与卡片数。
+    private var bundledDeckStatus: String {
+        guard UserDefaults.standard.bool(forKey: SharedKeys.seedImported) else {
+            return "尚未导入"
+        }
+        if let cache = RotationCache.loadBundled(), let deck = cache.decks.first {
+            return "已导入（\(deck.title)，\(cache.cards.count) 张）"
+        }
+        return "已导入"
+    }
 
+    // MARK: Toast
     @ViewBuilder
     private var toastView: some View {
         if let toast {
