@@ -134,6 +134,7 @@
 		78D8C2E12802C52EE48743CA /* check_pbxproj.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "check_pbxproj.py"; sourceTree = "<group>"; };
 		6BDCB570B4A713DAC6B91D80 /* check_swift_consistency.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "check_swift_consistency.py"; sourceTree = "<group>"; };
 		ADA18F451EF8276025BD0754 /* generate_pbxproj.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "generate_pbxproj.py"; sourceTree = "<group>"; };
+		80242B1E441114EC9284ACB4 /* pick_simulator.py */ = {isa = PBXFileReference; lastKnownFileType = text; path = "pick_simulator.py"; sourceTree = "<group>"; };
 		BDCFF6A7F6E4864A50849064 /* PdfReview.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PdfReview.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F948097A0B3D35815607F191 /* PdfReviewWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PdfReviewWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -357,6 +358,7 @@
 				78D8C2E12802C52EE48743CA,
 				6BDCB570B4A713DAC6B91D80,
 				ADA18F451EF8276025BD0754,
+				80242B1E441114EC9284ACB4,
 			);
 			name = "scripts";
 			path = "scripts";

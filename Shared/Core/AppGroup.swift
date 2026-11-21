@@ -27,10 +27,21 @@ enum AppGroup {
     }
 
     /// 共享 UserDefaults。用于保存轻量状态（手动偏移量、收藏集合等）。
-    /// 容器不可用时同样降级到 standard，避免崩溃。
-    static var defaults: UserDefaults {
-        UserDefaults(suiteName: identifier) ?? .standard
-    }
+    ///
+    /// 这里必须先用 `isContainerAvailable` 挡一道，不能直接
+    /// `UserDefaults(suiteName:) ?? .standard`。原因：侧载（免费 Apple ID
+    /// 重签）时 App 没有 App Groups 能力，而 `UserDefaults(suiteName:)`
+    /// 传一个不在 entitlements 里的组名，系统会在 CFPrefs 层直接抛出
+    /// 致命错误把进程杀掉——那一层是 C 代码，Swift 的 `??` 兜不住，
+    /// 表现就是「一打开就闪退」，且不是崩溃报告里那种可读的 Swift 异常。
+    ///
+    /// 用 `static let` 而不是每次现算：`defaults` 在启动路径上被反复读，
+    /// 而且 `isContainerAvailable` 会真写一个探测文件。`static let` 由
+    /// Swift 保证只初始化一次且线程安全，顺带避开可变全局状态。
+    static let defaults: UserDefaults = {
+        guard isContainerAvailable else { return UserDefaults.standard }
+        return UserDefaults(suiteName: identifier) ?? .standard
+    }()
 
     /// 轮换缓存文件路径。
     static var cacheFileURL: URL {
