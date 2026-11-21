@@ -54,6 +54,44 @@ enum AIError: LocalizedError {
     }
 }
 
+// MARK: - 进度
+
+/// 分析进度。比单个 `Double` 多带三样东西，界面上「看到分析到哪一步」全靠它：
+/// 当前第几块、共几块、已产出几张卡、以及最近几块的卡面用于翻入动画。
+///
+/// 之所以要带「已产出卡片」而不是只带数字：模型每块耗时差别很大，
+/// 只涨百分比的话用户无法判断「是卡住了还是在干活」。看到卡片一张张
+/// 冒出来，比任何进度条都更能说明它没死。
+struct AnalysisProgress: Sendable, Equatable {
+
+    /// 0...1，已经完成的块数占比。
+    var fraction: Double
+
+    /// 正在处理第几块（1 起）。已全部完成时等于 `chunkTotal`。
+    var chunkIndex: Int
+
+    /// 总块数。
+    var chunkTotal: Int
+
+    /// 到目前为止产出的卡片张数。
+    var cardsSoFar: Int
+
+    /// 最近完成的这一块产出的卡片题面，给界面的翻入动画用。
+    /// 只放题面，不放答案与解析 —— 预览不该把内容全剧透。
+    var recentQuestions: [String]
+
+    /// 全部完成时的状态。
+    static func finished(chunkTotal: Int, cards: Int) -> AnalysisProgress {
+        AnalysisProgress(
+            fraction: 1,
+            chunkIndex: chunkTotal,
+            chunkTotal: chunkTotal,
+            cardsSoFar: cards,
+            recentQuestions: []
+        )
+    }
+}
+
 // MARK: - 客户端
 
 actor AIClient {
@@ -77,7 +115,7 @@ actor AIClient {
         title: String,
         config: AIRequestConfig,
         cardsPerChunk: Int,
-        progress: @Sendable @escaping (Double) -> Void
+        progress: @Sendable @escaping (AnalysisProgress) -> Void
     ) async throws -> AnalysisDocument {
 
         guard !chunks.isEmpty else {
@@ -85,8 +123,19 @@ actor AIClient {
         }
 
         var collected: [AnalysisDocument.CardItem] = []
-        let total = Double(chunks.count)
+        let total = chunks.count
         let perChunk = min(12, max(3, cardsPerChunk))
+
+        // 第一块开始前先报一次 0%，界面才不会空着等第一块回来。
+        progress(
+            AnalysisProgress(
+                fraction: 0,
+                chunkIndex: 1,
+                chunkTotal: total,
+                cardsSoFar: 0,
+                recentQuestions: []
+            )
+        )
 
         for chunk in chunks {
             try Task.checkCancellation()
@@ -99,8 +148,15 @@ actor AIClient {
             )
             collected.append(contentsOf: items)
 
-            let done = Double(chunk.index + 1) / total
-            progress(done)
+            progress(
+                AnalysisProgress(
+                    fraction: Double(chunk.index + 1) / Double(total),
+                    chunkIndex: chunk.index + 1,
+                    chunkTotal: total,
+                    cardsSoFar: collected.count,
+                    recentQuestions: items.map(\.question)
+                )
+            )
 
             // 卡片总量保护
             if collected.count >= AnalysisValidator.Limits.cardsMax {

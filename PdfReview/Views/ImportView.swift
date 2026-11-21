@@ -47,8 +47,22 @@ final class ImportSession: ObservableObject {
 
     @Published private(set) var stage: Stage = .idle
     @Published private(set) var summary: PDFSummary?
-    /// 0...1 的分析进度，仅在 `.analyzing` 时有意义。
-    @Published private(set) var progress: Double = 0
+    /// 分析进度详情，仅在 `.analyzing` 时有意义。
+    ///
+    /// 不再是单个 Double：界面上要显示「第 3/8 块」「已生成 18 张」
+    /// 和卡片翻入动画，光有百分比做不到。
+    @Published private(set) var progress: AnalysisProgress = AnalysisProgress(
+        fraction: 0,
+        chunkIndex: 0,
+        chunkTotal: 0,
+        cardsSoFar: 0,
+        recentQuestions: []
+    )
+    /// 已经翻入过的卡片题面，供界面堆叠展示。
+    ///
+    /// 单独存一份而不是只读 `progress.recentQuestions`：后者每块都会被替换，
+    /// 而堆叠动画需要「新卡片进来、旧卡片留在后面」的顺序感。
+    @Published private(set) var revealedQuestions: [String] = []
     @Published private(set) var errorMessage: String?
     /// 成功写入后的牌组信息。
     @Published private(set) var finishedDeckTitle: String = ""
@@ -134,7 +148,14 @@ final class ImportSession: ObservableObject {
         }
 
         stage = .analyzing
-        progress = 0
+        progress = AnalysisProgress(
+            fraction: 0,
+            chunkIndex: 1,
+            chunkTotal: chunks.count,
+            cardsSoFar: 0,
+            recentQuestions: []
+        )
+        revealedQuestions = []
         errorMessage = nil
 
         let chunks = self.chunks
@@ -148,9 +169,19 @@ final class ImportSession: ObservableObject {
             // 进度回调从 AI actor 的上下文里来，必须跳回主线程再写 @Published。
             // 注意这里只捕获 self 引用本身，不捕获任何视图状态（那是并发违规）；
             // self?.progress 的写入在 @MainActor 隔离的 Task 里完成。
-            let onProgress: @Sendable (Double) -> Void = { [weak self] value in
+            let onProgress: @Sendable (AnalysisProgress) -> Void = { [weak self] value in
                 Task { @MainActor in
-                    self?.progress = value
+                    guard let self else { return }
+                    self.progress = value
+                    // 只把新出现的题面追加进去，保留历史顺序给堆叠动画用。
+                    // 不直接赋值 recentQuestions：那样每换一块就整组替换，
+                    // 界面上的卡片会跳动而不是一张张叠上去。
+                    let fresh = value.recentQuestions.filter {
+                        !self.revealedQuestions.contains($0)
+                    }
+                    if !fresh.isEmpty {
+                        self.revealedQuestions.append(contentsOf: fresh)
+                    }
                 }
             }
 
@@ -176,7 +207,10 @@ final class ImportSession: ObservableObject {
                         language: document.deck.language,
                         cards: document.cards
                     )
-                    self.progress = 1
+                    self.progress = AnalysisProgress.finished(
+                        chunkTotal: self.progress.chunkTotal,
+                        cards: document.cards.count
+                    )
                     self.finishedDeckTitle = document.deck.title
                     self.finishedCardCount = document.cards.count
                     self.stage = .done
@@ -212,7 +246,14 @@ final class ImportSession: ObservableObject {
         pdfPageCount = 0
         pdfFileName = ""
         summary = nil
-        progress = 0
+        progress = AnalysisProgress(
+            fraction: 0,
+            chunkIndex: 0,
+            chunkTotal: 0,
+            cardsSoFar: 0,
+            recentQuestions: []
+        )
+        revealedQuestions = []
         errorMessage = nil
         finishedDeckTitle = ""
         finishedCardCount = 0
@@ -252,6 +293,9 @@ struct ImportView: View {
     @EnvironmentObject private var settings: AppSettings
     @Environment(\.dismiss) private var dismiss
 
+    /// 用户开了「减弱动态效果」时，阶段切换只做淡入，不做位移。
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     /// 由 RootView 注入：关掉导入面板并切到设置页。
     let onOpenSettings: () -> Void
 
@@ -268,6 +312,12 @@ struct ImportView: View {
     }
 
     @State private var activePicker: PickerKind?
+
+    /// 完成页的勾号是否已经弹出来了。
+    ///
+    /// 单独一个 State 而不是直接 `scaleEffect(1)`：`.onAppear` 里同一个
+    /// 渲染周期内改值的话，SwiftUI 会把它当作初始状态，动画不播。
+    @State private var didCelebrate = false
 
     /// 从「分享到本 App」送进来的文件。非 nil 时一进面板就直奔对应阶段。
     let prefilled: ImportInbox.Pending?
@@ -290,6 +340,7 @@ struct ImportView: View {
                 case .analyzing:
                     ImportingView(
                         progress: session.progress,
+                        revealedQuestions: session.revealedQuestions,
                         onCancel: { session.cancel() }
                     )
                 case .done:
@@ -298,6 +349,12 @@ struct ImportView: View {
                     failedView
                 }
             }
+            // 阶段切换时给整组内容一个淡入 + 轻微上浮。
+            // 用 .id(session.stage) 强制让 Group 换一个身份，
+            // 否则 SwiftUI 会尽量复用同一棵子树，过渡动画不触发。
+            .id(session.stage)
+            .transition(.opacity.combined(with: .move(edge: .bottom)))
+            .animation(reduceMotion ? .easeInOut(duration: 0.2) : .easeInOut(duration: 0.32), value: session.stage)
             .navigationTitle("导入")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -478,17 +535,41 @@ struct ImportView: View {
     private var finishedView: some View {
         List {
             Section {
-                ContentUnavailableView {
-                    Label("导入完成", systemImage: "checkmark.circle")
-                } description: {
+                // 不用 ContentUnavailableView：它的标题字号由系统决定，
+                // 这里要让勾号单独做一次弹入，自己排更好控制。
+                VStack(spacing: 14) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 54))
+                        .foregroundStyle(Color.accentColor)
+                        .scaleEffect(didCelebrate ? 1 : 0.4)
+                        .opacity(didCelebrate ? 1 : 0)
+                        .animation(
+                            reduceMotion
+                                ? .easeInOut(duration: 0.22)
+                                : .spring(response: 0.45, dampingFraction: 0.58),
+                            value: didCelebrate
+                        )
+
+                    Text("导入完成")
+                        .font(.headline)
+
                     Text("「\(session.finishedDeckTitle)」已加入牌组，共 \(session.finishedCardCount) 张卡片。")
-                } actions: {
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 8)
+
                     Button("完成") {
                         dismiss()
                     }
                     .buttonStyle(.borderedProminent)
+                    .padding(.top, 4)
                 }
-                .listRowInsets(EdgeInsets(top: 20, leading: 12, bottom: 20, trailing: 12))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                .task { didCelebrate = true }
             }
 
             Section {

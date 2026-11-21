@@ -120,7 +120,7 @@ kSecMatchLimit kSecAttrAccessible kSecMatchLimitOne kSecClassGenericPassword
 UIColor UIFont UIImage UIApplication UIScreen UIDevice UIWindowScene
 UIActivityViewController UIKit SwiftUI Foundation Combine PDFKit SwiftData
 WidgetKit AppIntents UniformTypeIdentifiers CharacterSet UTType
-AccessoryWidgetBackground Preview Context Animation Spring
+AccessoryWidgetBackground Preview Context Animation Spring StrokeStyle
 App Scene WindowGroup DocumentGroup Settings ImmersiveSpace MenuBarExtra
 TimeInterval UInt UInt8 UInt16 UInt32 UInt64 Int8 Int16 Int32 Int64
 Float80 Decimal NumberFormatter StringProtocol Sequence Collection IteratorProtocol
