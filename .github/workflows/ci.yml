@@ -80,8 +80,10 @@ jobs:
         # CI 没有开发者证书，产出未签名 IPA；
         # Windows 上用 Sideloadly / AltStore + 个人 Apple ID 签名后安装。
         run: |
-          APP="build/Build/Products/Debug-iphonesimulator/PdfReview.app"
-          test -d "$APP" || { echo "::error::找不到编译产物 $APP"; exit 1; }
+          # 动态定位 .app，不硬编码 SYMROOT 的目录层级
+          APP=$(find build -type d -name "PdfReview.app" | head -1)
+          test -n "$APP" || { echo "::error::build 下找不到 PdfReview.app"; find build -maxdepth 4 -type d | head -30; exit 1; }
+          echo "找到产物: $APP"
           mkdir Payload
           cp -R "$APP" Payload/
           # .app 里已内嵌 Widget 的 .appex（Embed Foundation Extensions 阶段完成）
