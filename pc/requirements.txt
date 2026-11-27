@@ -1,0 +1,33 @@
+# PdfReview PC -- dependency pins
+#
+# Everything installs into pc/.venv; the system Python is left alone.
+# Versions are pinned: these libraries have changed parsing behaviour in
+# patch releases (pypdf text extraction in particular), and being able to
+# reproduce a bug matters more than being on the newest build.
+#
+# NOTE: keep this file pure ASCII. pip decodes requirements.txt with the
+# system locale codec (GBK on a Chinese Windows), so UTF-8 Chinese comments
+# make pip abort with UnicodeDecodeError before it installs anything.
+#
+# Install:
+#   python -m venv .venv
+#   .venv\Scripts\python.exe -m pip install -r requirements.txt
+
+# PDF text-layer extraction
+pypdf==7.2.0
+
+# Office documents
+python-docx==1.2.0
+python-pptx==1.0.2
+openpyxl==3.1.5
+
+# HTML parsing
+beautifulsoup4==4.15.0
+lxml==6.2.0
+
+# Image handling (only used to diagnose image-only PDFs for now; kept as the
+# foundation for a future OCR path)
+Pillow==12.3.0
+
+# Packaging (build time only, not needed at runtime)
+pyinstaller==6.22.3

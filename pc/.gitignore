@@ -1,0 +1,21 @@
+# PdfReview PC 的本地产物
+#
+# 这些都不该进仓库：虚拟环境、打包中间产物、测试样本、运行时数据。
+
+.venv/
+.venv-probe/
+.probe/
+
+build/
+dist/
+*.spec
+
+__pycache__/
+*.py[cod]
+
+# 运行时数据（设置、API Key 密文、临时工程）
+data/
+*.log
+
+# 测试用样本（脚本可重新生成，见 scripts/make_samples.py）
+samples/

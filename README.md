@@ -2,6 +2,8 @@
 
 一个 iOS App：上传 PDF，AI 提炼成复习卡片，在**桌面小组件**里每 3 小时自动轮换一张，帮你利用碎片时间复习。支持历史记录回看、收藏、离线导入/导出。
 
+仓库里还有一个 **Windows 桌面版**（`pc/`）：同一套格式标准，支持 PDF / Word / PowerPoint / Excel / 纯文本 / Markdown / 网页 → `.pdfreview.json`，导出后传到手机上导入。适合「文档在电脑上、想先批量做完再导到手机」的场景。详见 [`pc/README.md`](pc/README.md)。
+
 ---
 
 ## ⚠️ 两条必须先读的事
@@ -119,6 +121,8 @@ python scripts/generate_pbxproj.py
 | 收藏 | 两端同步（App Group + UserDefaults） |
 | 导出 | 任意牌组一键导出为 `.pdfreview.json`，可分享、可再次导入 |
 | 内置示例内容 | 首次启动自动导入 24 张示例卡片，装完就有东西看 |
+| 提问 | 就着牌组原文向 AI 提问；AI 判断值得记的，能一键变成一张卡片存进指定牌组，历史可翻回 |
+| **Windows 桌面版** | 同一套格式标准，支持 7 种文档格式 → `.pdfreview.json`，见 [`pc/README.md`](pc/README.md) |
 
 ## 分析文件格式（自建标准）
 
@@ -126,10 +130,13 @@ python scripts/generate_pbxproj.py
 
 - 机器可校验 Schema：`schema/analysis.v1.schema.json`（JSON Schema draft 2020-12）
 - Swift 实现：`Shared/Models/AnalysisDocument.swift`（`AnalysisValidator`）
+- **PC 实现：`pc/core/limits.py` + `pc/core/cards.py`**（独立的一套，常量逐字对齐）
 - 人读文档：`docs/pdf-analysis-format.md`
 - 示例：`samples/sample-analysis.json`（完整）、`samples/sample-analysis-minimal.json`（最小）
 
 文件必须通过 8MB 上限 + 未知字段拒绝 + 全字段范围校验。校验错误全是中文描述。
+
+`scripts/check_format_consistency.py` 会把 Swift / PC / schema 三方的常量逐项比对——任何一边改了另一边没跟上，CI 会红。这类偏差不会报错，只会让两边导入行为悄悄不一致，等到有用户碰到边界文件才暴露。
 
 ## 目录结构
 
@@ -162,6 +169,10 @@ pdf-review/
 │   └── Resources/           # 含 bundled-deck.pdfreview.json（内置示例牌组）
 ├── PdfReviewWidget/         # Widget target（Timeline Provider + App Intents）
 │   └── Resources/           # 含 bundled-wheel.json（内置轮换缓存）
+├── pc/                      # Windows 桌面版（Python + tkinter）
+│   ├── core/                # 业务逻辑（不许 import tkinter）
+│   ├── ui/                  # 界面
+│   └── scripts/             # 生成示例 / 打包
 └── PdfReview.xcodeproj/
 ```
 

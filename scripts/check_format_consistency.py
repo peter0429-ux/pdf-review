@@ -33,6 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = ROOT / "schema" / "analysis.v1.schema.json"
 SWIFT_PATH = ROOT / "Shared" / "Models" / "AnalysisDocument.swift"
 DOC_PATH = ROOT / "docs" / "pdf-analysis-format.md"
+PC_LIMITS_PATH = ROOT / "pc" / "core" / "limits.py"
 SAMPLES_DIR = ROOT / "samples"
 
 
@@ -193,6 +194,52 @@ def swift_known_keys(src: str) -> dict[str, set[str]]:
     return result
 
 
+def pc_limits(src: str) -> dict[str, object]:
+    """从 `pc/core/limits.py` 里抠出常量，用于第四方比对。
+
+    PC 版是独立实现的，最容易出的问题不是「写错了」而是「有一天 iOS 改了，
+    PC 没跟着改」。这种偏差不会报错——它只是让两边的导入行为悄悄不一致，
+    直到用户碰到一份刚好卡在边界上的文件。
+    """
+    out: dict[str, object] = {}
+
+    simple = {
+        "QUESTION_MAX": "questionMax",
+        "ANSWER_MAX": "answerMax",
+        "DETAIL_MAX": "detailMax",
+        "TAGS_MAX": "tagsMax",
+        "TAG_LENGTH_MAX": "tagLengthMax",
+        "CARDS_MAX": "cardsMax",
+        "TITLE_MAX": "titleMax",
+        "SUMMARY_MAX": "summaryMax",
+        "GENERATOR_MAX": "generatorMax",
+        "SCORE_MIN": "scoreMin",
+        "SCORE_MAX": "scoreMax",
+        "CHUNK_MAX_CHARS": "chunkMaxChars",
+    }
+    for const, key in simple.items():
+        match = re.search(rf"^{const}\s*=\s*([0-9][0-9_]*)\s*$", src, re.MULTILINE)
+        if match:
+            out[key] = int(match.group(1).replace("_", ""))
+
+    version = re.search(r'^SUPPORTED_VERSION\s*=\s*"([^"]+)"', src, re.MULTILINE)
+    if version:
+        out["supportedVersion"] = version.group(1)
+
+    # MAX_FILE_BYTES = 8 * 1024 * 1024
+    size = re.search(
+        r"^MAX_FILE_BYTES\s*=\s*(\d+)\s*\*\s*(\d+)\s*\*\s*(\d+)", src, re.MULTILINE
+    )
+    if size:
+        out["maxFileBytes"] = int(size.group(1)) * int(size.group(2)) * int(size.group(3))
+    else:
+        size = re.search(r"^MAX_FILE_BYTES\s*=\s*(\d+)\s*$", src, re.MULTILINE)
+        if size:
+            out["maxFileBytes"] = int(size.group(1))
+
+    return out
+
+
 def schema_constraints(schema: dict) -> dict[str, object]:
     """把 schema 里关心的数字提取成扁平字典，便于和 Swift 比对。"""
     card = schema["$defs"]["card"]
@@ -272,7 +319,44 @@ def main() -> int:
         else:
             notes.append(f"{label}一致：{s_val}")
 
-    # ---- 3. schema 的 additionalProperties:false 必须与 KnownKeys 对得上 ----
+    # ---- 3. PC 版的常量必须与 Swift 一致 ----
+    if not PC_LIMITS_PATH.exists():
+        problems.append(f"找不到 PC 版的常量文件：{PC_LIMITS_PATH}")
+    else:
+        pc = pc_limits(read(PC_LIMITS_PATH))
+        pc_pairs = [
+            ("questionMax", "题目上限"),
+            ("answerMax", "答案上限"),
+            ("detailMax", "补充说明上限"),
+            ("tagsMax", "标签数量上限"),
+            ("tagLengthMax", "单个标签长度上限"),
+            ("cardsMax", "卡片数量上限"),
+            ("titleMax", "牌组标题上限"),
+            ("maxFileBytes", "单文件体积上限"),
+        ]
+        for key, label in pc_pairs:
+            s_val = limits.get(key) if key != "maxFileBytes" else swift_max_file_bytes(swift)
+            p_val = pc.get(key)
+            if p_val is None:
+                problems.append(f"PC 版 limits.py 里找不到 {key}（{label}）")
+            elif s_val is not None and s_val != p_val:
+                problems.append(
+                    f"{label}在两端不一致：Swift={s_val}，PC={p_val}"
+                )
+            elif s_val is not None:
+                notes.append(f"{label}两端一致：{p_val}")
+
+        pc_version = pc.get("supportedVersion")
+        if pc_version is None:
+            problems.append("PC 版 limits.py 里找不到 SUPPORTED_VERSION")
+        elif pc_version != supported:
+            problems.append(
+                f"格式版本号两端不一致：Swift={supported!r}，PC={pc_version!r}"
+            )
+        else:
+            notes.append(f"格式版本号两端一致：{pc_version!r}")
+
+    # ---- 4. schema 的 additionalProperties:false 必须与 KnownKeys 对得上 ----
     known = swift_known_keys(swift)
     schema_key_sets = {
         "root": set(schema["properties"].keys()),

@@ -9,6 +9,11 @@
 ## [未发布]
 
 ### 新增
+- **Windows 桌面版（`pc/`）**：同一套 `.pdfreview.json` 格式标准，支持 PDF / Word（`.docx`）/ PowerPoint（`.pptx`）/ Excel（`.xlsx`）/ 纯文本 / Markdown / 网页（`.html`）→ 复习卡片，导出后传到手机导入。
+  - `pc/core/`：`limits` / `cards` / `settings` / `project` / `extract` / `chunker` / `schema_check` / `ai` / `analyzer` / `export` 十个模块，全部不 import tkinter。
+  - `pc/ui/`：tkinter 界面（主窗口 / 新建牌组 / 设置 / 卡片预览），耗时操作走后台线程 + 队列轮询，窗口不假死。
+  - `pc/scripts/`：`make_samples.py` 生成七种示例、`build.py` 打成 `--onedir` 并压 zip。
+  - 打包产物带 `--selftest`：不联网地把八个依赖、schema、切块、导出各验一遍，用户报「导不出 Excel」时直接让他跑。
 - **提问功能**：新增第五个标签页「提问」。选一份牌组提问，AI 先回答，再判断这个知识点值不值得做成复习卡片；值得时给一张可编辑的草稿，用户改完点一下就进了轮换池。
   - `AIClient.ask(...)` 与 `AskResult`（`answer` / `worthSaving` / `reason` / `draft`）。
   - `AskThread` 模型与 `CardStore` 的 `insertAskThread` / `markThreadSaved` / `askThread(withID:)` / `askThreads(limit:)` / `delete(askThread:)`。
@@ -26,10 +31,14 @@
   - `rotation-cache.json` 这个名字**只**指 App 运行时写进 App Group 容器的那份缓存。
 - 设置页的「内置内容」不再硬编码牌组名，改为从内置缓存里读真实标题与卡片数。
 - 仓库开源配套：MIT `LICENSE`、`CONTRIBUTING.md`、本文件；README 增加「AI 编写」与「App Groups 必须开启 / 植入方法」两节。
+- `scripts/check_format_consistency.py` 增加第四方比对：`pc/core/limits.py` 的常量必须与 Swift 逐项一致。
 
 ### 说明
 - **`AskThread` 刻意不建 SwiftData 关系**。卡片会被删、会被移到别的牌组；用 `@Relationship` 要么级联删掉提问历史，要么把 `savedCardID` 置空，两种都不对。留一个普通 `UUID` 字段，历史独立存活。
 - **`worthSaving` 与 `draft` 必须同时成立**。模型说「值得」却给不出可解析的卡（字段缺失、被截成空串）时，按不值得处理——否则用户点保存才发现是空卡。这条在 `AIClient.decodeAskResult` 里强制，不信任模型的自我声明。
+- **PC 版只打 `--onedir`**。`--onefile` 会把依赖解到临时目录再启动，沙箱里解压 VCRUNTIME140.dll 被拒（`fopen: Permission denied`），换 TEMP 与 `--runtime-tmpdir` 都无效。onedir 启动更快、缺 dll 也更容易定位。
+- **`pc/requirements.txt` 必须纯 ASCII**。pip 用系统 locale（中文 Windows 是 GBK）解码它，UTF-8 中文注释会让 pip 直接 `UnicodeDecodeError` 退出。
+- **PC 版不读 schema 文件来取上限**。schema 只描述什么合法，不描述「超了怎么截断」；而且打包后读资源文件多一层路径依赖。所以 `pc/core/limits.py` 自己写一份常量，靠 `check_format_consistency.py` 保证两边不漂移。
 
 ---
 
