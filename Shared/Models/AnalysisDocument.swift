@@ -52,7 +52,9 @@ struct AnalysisDocument: Codable {
         var language: String?
     }
 
-    struct CardItem: Codable {
+    /// 一张卡片。`Equatable` 是为了让 `AskResult` 能合成一致性 ——
+    /// 界面拿它做状态比较（不参与 Codable 编解码，不影响文件格式）。
+    struct CardItem: Codable, Equatable {
         var question: String
         var answer: String
         var detail: String?

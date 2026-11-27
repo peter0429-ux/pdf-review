@@ -379,7 +379,7 @@ struct AskView: View {
                 var threadID: UUID?
                 do {
                     threadID = try store.insertAskThread(
-                        question: asked.question,
+                        question: askedQuestion,
                         answer: asked.answer,
                         worthSaving: asked.worthSaving,
                         reason: asked.reason,
@@ -393,7 +393,7 @@ struct AskView: View {
 
                 result = asked
                 currentThreadID = threadID
-                currentQuestion = asked.question
+                currentQuestion = askedQuestion
                 resultDeckID = deck.id
                 resultDeckTitle = deck.title
                 prepareDraft(from: asked)
