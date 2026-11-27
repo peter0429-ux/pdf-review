@@ -33,6 +33,13 @@ final class ReviewDeck {
     /// 语言标记，如 "zh-Hans"。
     var language: String?
 
+    /// PDF 原文（切块之前的完整文本），提问时作为 AI 的上下文。
+    ///
+    /// 只存前 `ReviewDeck.sourceTextLimit` 个字：完整原文动辄几万字，
+    /// 存下来会让库膨胀，而 AI 回答单次提问也用不到那么多。
+    /// 为 nil 表示这份牌组没有可用的原文（手工导入的格式文件、或旧数据）。
+    var sourceText: String?
+
     var createdAt: Date
     var updatedAt: Date
     var isArchived: Bool
@@ -49,6 +56,7 @@ final class ReviewDeck {
         pageCount: Int = 0,
         summary: String? = nil,
         language: String? = nil,
+        sourceText: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         isArchived: Bool = false
@@ -60,6 +68,7 @@ final class ReviewDeck {
         self.pageCount = pageCount
         self.summary = summary
         self.language = language
+        self.sourceText = sourceText
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.isArchived = isArchived
@@ -70,6 +79,10 @@ final class ReviewDeck {
 // MARK: - 便捷访问
 
 extension ReviewDeck {
+    /// 原文最多保留多少字。约 12 万字节，单牌组可接受；
+    /// 也给 AI 留了足够上下文（远超一次问答实际需要）。
+    static let sourceTextLimit = 40_000
+
     /// 按创建时间排序的卡片。
     var sortedCards: [ReviewCard] {
         cards.sorted { $0.createdAt < $1.createdAt }
@@ -77,4 +90,18 @@ extension ReviewDeck {
 
     /// 未归档的牌组（用于构建轮换池）。
     var isRotatable: Bool { !isArchived && !cards.isEmpty }
+
+    /// 是否有可用于问答的原文。
+    var hasSourceText: Bool {
+        guard let sourceText else { return false }
+        return !sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 截断到上限。导入时调用，避免把整份原文塞进库里。
+    static func clippedSourceText(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.count <= sourceTextLimit { return trimmed }
+        return String(trimmed.prefix(sourceTextLimit))
+    }
 }

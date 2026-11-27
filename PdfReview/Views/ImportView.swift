@@ -70,6 +70,8 @@ final class ImportSession: ObservableObject {
 
     /// 解析好的文本块，供分析使用。
     private var chunks: [TextChunk] = []
+    /// 抽取出来的原文。分析完成后随牌组一起存进 SwiftData，供「提问」页当上下文。
+    private var extractedText: String = ""
     /// 当前 PDF 的元信息。
     private var pdfPageCount: Int = 0
     private var pdfFileName: String = ""
@@ -115,6 +117,10 @@ final class ImportSession: ObservableObject {
                 }
 
                 self.chunks = chunks
+                // 原文留下来：分析完成后要随牌组一起存进去，供「提问」页当上下文用。
+                // 截断放在 CardStore 里做（ReviewDeck.clippedSourceText），这里先原样留着，
+                // 因为 PDFSummary 的字数统计也是用它算的。
+                self.extractedText = extraction.fullText
                 self.summary = PDFSummary(
                     fileName: url.lastPathComponent,
                     pageCount: extraction.pageCount,
@@ -205,6 +211,7 @@ final class ImportSession: ObservableObject {
                         pageCount: pageCount > 0 ? pageCount : document.source.pageCount,
                         summary: document.deck.summary,
                         language: document.deck.language,
+                        sourceText: self.extractedText,
                         cards: document.cards
                     )
                     self.progress = AnalysisProgress.finished(
@@ -243,6 +250,7 @@ final class ImportSession: ObservableObject {
         analysisTask?.cancel()
         analysisTask = nil
         chunks = []
+        extractedText = ""
         pdfPageCount = 0
         pdfFileName = ""
         summary = nil

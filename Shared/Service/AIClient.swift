@@ -92,6 +92,29 @@ struct AnalysisProgress: Sendable, Equatable {
     }
 }
 
+// MARK: - 问答
+
+/// 一次提问的结果。
+///
+/// 「回答」与「值不值得做成卡片」是两件独立的事：用户问的往往是个具体疑惑，
+/// 而卡片必须是能自测的题。所以要分别给，不能用「worthSaving == false 就连回答都没有」
+/// 这种设计 —— 用户至少该拿到答案。
+struct AskResult: Sendable, Equatable {
+
+    /// 直接回答用户问题的正文。
+    var answer: String
+
+    /// AI 判断这个知识点值不值得做成复习卡片。
+    var worthSaving: Bool
+
+    /// 判断理由，一句话。可能为 nil。
+    var reason: String?
+
+    /// 卡片草稿。`worthSaving == true` 时应当有；解析失败时为 nil，
+    /// 界面据此退化成「只显示回答，不给保存按钮」。
+    var draft: AnalysisDocument.CardItem?
+}
+
 // MARK: - 客户端
 
 actor AIClient {
@@ -188,6 +211,236 @@ actor AIClient {
         )
         document.deck.summary = "共 \(deduped.count) 张卡片，覆盖第 1 至 \(document.source.pageCount) 页。"
         return document
+    }
+
+    // MARK: 问答
+
+    /// 就一份牌组里的内容提问。
+    ///
+    /// - Parameters:
+    ///   - question: 用户原话。
+    ///   - deckTitle: 牌组标题，给模型一个「在问哪份资料」的锚点。
+    ///   - context: 牌组原文（可能已被截断）。传空串表示没有原文，
+    ///     此时模型只能凭 `cardsDigest` 或通用知识回答，界面应提示用户。
+    ///   - cardsDigest: 已有卡片的题面摘要，原文缺失时作为替代上下文。
+    func ask(
+        question: String,
+        deckTitle: String,
+        context: String,
+        cardsDigest: [String],
+        config: AIRequestConfig
+    ) async throws -> AskResult {
+
+        let trimmedQuestion = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuestion.isEmpty else {
+            throw AIError.invalidResponse("请先输入问题。")
+        }
+
+        var lastError: Error?
+
+        for attempt in 0..<2 {
+            do {
+                return try await performAskRequest(
+                    question: trimmedQuestion,
+                    deckTitle: deckTitle,
+                    context: context,
+                    cardsDigest: cardsDigest,
+                    config: config,
+                    temperature: attempt == 0 ? 0.4 : 0.2
+                )
+            } catch let error as AIError {
+                lastError = error
+                switch error {
+                case .missingConfiguration, .cancelled:
+                    throw error
+                case .http(401, _), .http(403, _), .http(404, _):
+                    throw error
+                default:
+                    continue
+                }
+            } catch is CancellationError {
+                throw AIError.cancelled
+            } catch {
+                lastError = error
+                continue
+            }
+        }
+
+        throw lastError ?? AIError.invalidResponse("提问失败，请稍后再试。")
+    }
+
+    private func performAskRequest(
+        question: String,
+        deckTitle: String,
+        context: String,
+        cardsDigest: [String],
+        config: AIRequestConfig,
+        temperature: Double
+    ) async throws -> AskResult {
+
+        let systemPrompt = """
+        你是一位耐心的学科答疑老师，同时负责判断哪些问答值得沉淀成复习卡片。
+
+        你必须**先完整回答**用户的问题，再**单独判断**这个知识点值不值得做成卡片。
+        两件事互不依赖：即使不值得做卡片，回答也必须给全。
+
+        什么样的问题值得做成卡片：
+        - 问的是一个可复用的知识（概念、原理、公式、易错点），不是「这段文字怎么读」这类一次性疑问。
+        - 换一个人、换一天再问，答案仍然成立。
+        - 答案能独立读懂，不需要再翻回原文。
+
+        什么样的问题不值得：
+        - 只是在问某个文件的操作方法、页码、格式。
+        - 答案严重依赖本次对话的上下文，脱离后无法理解。
+        - 问题本身有歧义、或你无法确定答案。
+
+        卡片的题目必须改写成**能自测的疑问句或填空句**，不要照抄用户原话。
+        例如用户问「什么是循环引用」，卡片的题目应该是「ARC 下什么情况会造成循环引用？」而不是「什么是循环引用」。
+        改写后仍要能回答用户原本的困惑。
+
+        只用简体中文输出。只输出一个 JSON 对象，不要 Markdown 代码块，不要任何解释文字。
+        """
+
+        // 上下文缺失时的降级：告诉模型「你只有卡片题面」，别让它假装读过原文。
+        let contextBlock: String
+        if !context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            contextBlock = """
+            资料原文（可能已被截断）：
+            ---
+            \(context)
+            ---
+            """
+        } else if !cardsDigest.isEmpty {
+            let digest = cardsDigest.prefix(60).map { "- \($0)" }.joined(separator: "\n")
+            contextBlock = """
+            注意：这份资料没有保存原文，你只能看到已有卡片的题面。
+            回答时如果缺乏依据，请直说「资料里没有这部分内容」，不要编造。
+
+            已有卡片的题面：
+            \(digest)
+            """
+        } else {
+            contextBlock = """
+            注意：这份资料既没有原文也没有卡片，请仅凭通用知识回答，
+            并在回答里提醒用户这条回答不是基于他的资料。
+            """
+        }
+
+        let userPrompt = """
+        资料标题：\(deckTitle)
+
+        \(contextBlock)
+
+        用户的问题：
+        \(question)
+
+        严格按以下 JSON 结构输出：
+
+        {
+          "answer": "对用户问题的完整回答",
+          "worthSaving": true 或 false,
+          "reason": "一句话说明为什么值得/不值得做成卡片",
+          "card": {
+            "question": "改写成能自测的疑问句或填空句",
+            "answer": "卡片背面的答案，简洁且可独立阅读",
+            "detail": "可选的补充说明或易错点，没有就给 null",
+            "tags": ["标签1", "标签2"],
+            "difficulty": 1到5的整数,
+            "importance": 1到5的整数
+          }
+        }
+
+        worthSaving 为 false 时，card 给 null。
+        worthSaving 为 true 时，card 必须有 question 与 answer。
+        """
+
+        let body: [String: Any] = [
+            "model": config.model,
+            "temperature": temperature,
+            "max_tokens": 4000,
+            "response_format": ["type": "json_object"],
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": userPrompt]
+            ]
+        ]
+
+        let data = try await postChatCompletion(body: body, config: config)
+        return try Self.decodeAskResult(from: data)
+    }
+
+    /// 从 Chat Completions 响应里解析出问答结果。
+    static func decodeAskResult(from responseData: Data) throws -> AskResult {
+
+        guard
+            let root = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any]
+        else {
+            throw AIError.invalidResponse("响应不是合法 JSON。")
+        }
+
+        if let errorObject = root["error"] as? [String: Any],
+           let message = errorObject["message"] as? String {
+            throw AIError.invalidResponse("服务返回错误：\(message)")
+        }
+
+        guard
+            let choices = root["choices"] as? [[String: Any]],
+            let first = choices.first,
+            let message = first["message"] as? [String: Any],
+            let content = message["content"] as? String
+        else {
+            throw AIError.invalidResponse("响应里没有 choices[0].message.content。")
+        }
+
+        let cleaned = stripCodeFence(content)
+        guard let contentData = cleaned.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: contentData) as? [String: Any]
+        else {
+            throw AIError.decoding("模型输出的内容不是 JSON 对象。")
+        }
+
+        guard let answer = (object["answer"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !answer.isEmpty
+        else {
+            throw AIError.decoding("模型没有给出回答。")
+        }
+
+        // worthSaving 可能是 Bool，也可能是 "true"/"false" 字符串（部分模型如此）。
+        let worthSaving = boolValue(object["worthSaving"])
+
+        // reason 可能缺失或为空白串，两种情况都归一成 nil。
+        let reasonText = (object["reason"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let reason: String? = (reasonText?.isEmpty == false) ? reasonText : nil
+
+        // 草稿解析：拆成单张卡走已有的 parseCards，保证字段截断规则与分析流程一致。
+        // parseCards 在「全部缺 question/answer」时会抛错——这里正是想要的效果，
+        // 让 worthSaving 退化成 false，而不是给一张空卡。
+        var draft: AnalysisDocument.CardItem?
+        if worthSaving, let rawCard = object["card"] as? [String: Any] {
+            draft = (try? parseCards([rawCard]))?.first
+        }
+
+        // 模型说值得、却给不出可用的卡：按不值得处理，别让用户点了保存才发现是空卡。
+        let effectiveWorthSaving = worthSaving && draft != nil
+
+        return AskResult(
+            answer: answer,
+            worthSaving: effectiveWorthSaving,
+            reason: reason,
+            draft: effectiveWorthSaving ? draft : nil
+        )
+    }
+
+    /// JSON 里的布尔可能是 Bool，也可能是字符串或数字。
+    private static func boolValue(_ any: Any?) -> Bool {
+        if let bool = any as? Bool { return bool }
+        if let number = any as? NSNumber { return number.boolValue }
+        if let string = any as? String {
+            return ["true", "yes", "1", "是"].contains(string.lowercased())
+        }
+        return false
     }
 
     // MARK: 单块请求

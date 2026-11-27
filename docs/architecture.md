@@ -58,6 +58,33 @@ slotStart(n) = cache.epoch + (n - cache.manualOffset) * intervalHours * 3600
 
 **保证**：同一份 cache + 同一时刻，App 与 Widget 结果必然相同。
 
+### 3.3 提问链路（只走 App，不进小组件）
+
+```
+[用户提问]
+    │  question + 所选牌组的 sourceText（前 40_000 字）
+    ▼
+[AIClient.ask]  → POST {baseURL}/chat/completions
+    │             system prompt：先完整回答，再单独判断「值不值得做卡片」
+    ▼
+{ answer, worthSaving, reason, card }
+    │
+    ├─→ AskThread 入库（**无论如何都存**，哪怕没有卡片）
+    │       └─ deckID / deckTitle / draftData / savedCardID
+    │
+    └─→ worthSaving == true 且 card 可解析
+            └─→ 界面展示草稿 → 用户改 → insertCard(origin: "ask")
+                                         └─→ refreshRotationCache()
+```
+
+三条不能破的性质：
+
+1. **回答优先**。AI 觉得不值得做成卡片，也必须把答案给用户。所以 `AskResult.answer` 为空即视为失败，而不是「没有卡片就什么都不显示」。
+2. **`worthSaving` 与 `draft` 必须同时成立**。模型说「值得」却给不出可解析的卡（字段缺失、被截成空串），按不值得处理——否则用户点保存才发现是空卡。这条在 `AIClient.decodeAskResult` 里强制。
+3. **提问记录独立于卡片**。`AskThread` 与 `ReviewCard` 之间没有 SwiftData 关系，只有 `savedCardID` 这个普通字段。卡片被删、被移到别的牌组，提问历史都不受影响。
+
+问答完全不参与轮换：`AskThread` 不进 `RotationCache`，小组件也不读它。小组件只认 `CardSnapshot`。
+
 ## 4. 共享层 API（`Shared/`，双 target 编译）
 
 ### 4.1 `Shared/Core/AppGroup.swift`
@@ -140,6 +167,7 @@ enum RotationScheduler {
     var sourceFileName: String?
     var sourceKind: String        // "pdf" | "imported"
     var summary: String?
+    var sourceText: String?       // 原文前 40_000 字，供「提问」页当上下文
     var createdAt: Date
     var updatedAt: Date
     var isArchived: Bool
@@ -156,6 +184,7 @@ enum RotationScheduler {
     var difficulty: Int           // 1...5
     var importance: Int           // 1...5
     var isFavorite: Bool
+    var origin: String            // "analysis" | "ask" | "manual"
     var createdAt: Date
     @Relationship(deleteRule: .cascade, inverse: \CardDisplayRecord.card) var displays: [CardDisplayRecord]
     var deck: ReviewDeck?
@@ -168,7 +197,27 @@ enum RotationScheduler {
     var surface: String           // "widget" | "app"
     var card: ReviewCard?
 }
+
+/// 一次提问的记录。**与 ReviewCard 没有 SwiftData 关系**：
+/// 卡片可以单独删除、也可能被移到别的牌组，用关系会在删除时级联或置空，
+/// 而提问历史应当独立存在。所以只留普通字段 savedCardID / deckID。
+@Model final class AskThread {
+    var id: UUID
+    var question: String
+    var answer: String
+    var worthSaving: Bool
+    var reason: String?
+    var deckID: UUID?
+    var deckTitle: String?
+    var draftData: Data?          // AnalysisDocument.CardItem 的 JSON
+    var savedCardID: UUID?
+    var createdAt: Date
+}
 ```
+
+**为什么 `sourceText` 只存前 40 000 字**：一份 79 页讲义的原文约 2.6 万字，存全文会让每份牌组多占几十 KB 到几百 KB；而问答只需要「够模型判断上下文」的量。超出部分截断，prompt 里也会说明「只看到前一部分」。
+
+**为什么 `origin` 带默认值**：SwiftData 的轻量迁移只对「有默认值的新属性」安全。老库里的卡片读出来 `origin` 是 `"analysis"`，符合事实——提问功能上线前所有卡片都是分析产生的。
 
 `AnalysisDocument` 是 **Codable 交换格式**，不是 SwiftData 模型（见 `Shared/Models/AnalysisDocument.swift` 与格式文档）。
 
@@ -184,8 +233,32 @@ enum RotationScheduler {
     func backlogHistory(upTo date: Date) throws  // 回填已过去的 slot 到 CardDisplayRecord
     func bumpManualOffset() throws               // 「下一张」：+1 并写回 cache
     func save() throws
+
+    // 写入
+    @discardableResult
+    func insertDeck(title: String, sourceFileName: String?, sourceKind: String,
+                    pageCount: Int, summary: String?, language: String?,
+                    sourceText: String? = nil,
+                    cards: [AnalysisDocument.CardItem]) throws -> UUID
+    @discardableResult
+    func insertCard(into deck: ReviewDeck, question: String, answer: String,
+                    detail: String? = nil, tags: [String] = [], sourcePage: Int? = nil,
+                    difficulty: Int = 3, importance: Int = 3,
+                    origin: String = ReviewCard.Origin.manual) throws -> UUID
+
+    // 提问记录
+    @discardableResult
+    func insertAskThread(question: String, answer: String, worthSaving: Bool,
+                         reason: String?, deckID: UUID?, deckTitle: String?,
+                         draft: AnalysisDocument.CardItem?) throws -> UUID
+    func markThreadSaved(threadID: UUID, cardID: UUID) throws
+    func askThread(withID id: UUID) -> AskThread?
+    func askThreads(limit: Int = 100) -> [AskThread]
+    func delete(askThread: AskThread) throws
 }
 ```
+
+**`insertCard` 必须调 `refreshRotationCache()`**：用户保存一张卡之后，期待的是「它已经进了轮换池」，而不是「下次启动才生效」。这和 `insertDeck` 的处理一致。
 
 ### 4.6 服务层
 
@@ -206,7 +279,32 @@ enum AIError: Error, LocalizedError {
 
 actor AIClient {
     func analyze(chunks: [TextChunk], title: String, config: AIRequestConfig,
-                 cardsPerChunk: Int, progress: @Sendable @escaping (Double) -> Void) async throws -> AnalysisDocument
+                 cardsPerChunk: Int,
+                 progress: @Sendable @escaping (AnalysisProgress) -> Void) async throws -> AnalysisDocument
+
+    // 问答：先回答，再判断值不值得做成卡片。
+    // context 为空时降级到「卡片题面摘要」或「通用知识」，prompt 里会要求模型不要编造。
+    func ask(question: String, deckTitle: String, context: String,
+             cardsDigest: [String],
+             config: AIRequestConfig) async throws -> AskResult
+}
+
+/// 分析进度。带块号与已产出卡片数，界面才能显示「第 3/8 块」「已生成 18 张」。
+struct AnalysisProgress: Sendable, Equatable {
+    var fraction: Double          // 0...1
+    var chunkIndex: Int           // 1 起
+    var chunkTotal: Int
+    var cardsSoFar: Int
+    var recentQuestions: [String] // 最近一块产出的题面，供逐块翻入动画
+}
+
+/// 一次提问的结果。worthSaving 为 true 时 draft 必有值
+/// （模型说值得却给不出可用卡的，视作不值得）。
+struct AskResult: Sendable, Equatable {
+    var answer: String
+    var worthSaving: Bool
+    var reason: String?
+    var draft: AnalysisDocument.CardItem?
 }
 
 enum AnalysisImporter {
@@ -288,7 +386,7 @@ App Groups 要求 provisioning profile 绑定**明确的 App ID** 并登记该 g
 ## 6. 目录结构
 
 ```
-Shared/            双 target 编译（Models / Store / Service）
+Shared/            双 target 编译（Core 两端；Models / Store / Service 仅 App）
 PdfReview/         主 App（Views / Resources）
 PdfReviewWidget/   小组件扩展
 docs/              架构、格式、搭建、自检
@@ -315,3 +413,5 @@ PdfReviewWidget/Resources/bundled-wheel.json            → Widget target Resour
 4. App 的 `AnalysisDocument` 结构与 `schema/analysis.v1.schema.json` 必须一致。
 5. 所有面向用户的文案使用简体中文。
 6. 种子的 `epoch` 与卡片 ID 必须可复现（常量 + 文本派生），**不得**引入随机或时钟相关的初值。
+7. `AskThread` **不得** 加 `@Relationship` 指向 `ReviewCard` 或 `ReviewDeck`。卡片会被人删、会换牌组，提问历史必须独立存活。
+8. 新增的 SwiftData 属性**必须带默认值**（`origin: String = "analysis"`、`sourceText: String? = nil`）。没有默认值的非可选新属性会让老库无法轻量迁移，用户升级即崩。

@@ -2,11 +2,11 @@
 //  RootView.swift
 //  PdfReview
 //
-//  根视图：四个标签页（复习 / 牌组 / 历史 / 设置），外加两个全局出入口：
+//  根视图：五个标签页（复习 / 牌组 / 提问 / 历史 / 设置），外加两个全局出入口：
 //   - 导入流程以 sheet 呈现，由「复习」「牌组」两页的按钮触发
 //   - 首次启动的引导页以 fullScreenCover 呈现
 //
-//  启动维护（收藏回灌、历史回填、缓存物化）在 PdfReviewApp 里已经做过一次，
+//  启动维护（种子导入、收藏回灌、历史回填、缓存物化）在 AppRootView 里已经做过一次，
 //  这里不重复，只负责「首次启动要不要看引导」这一件界面相关的事。
 //
 
@@ -32,9 +32,13 @@ struct RootView: View {
     /// 首次引导。
     @State private var showOnboarding = false
 
+    /// 提问历史 sheet。从「提问」页右上角打开。
+    @State private var showAskHistory = false
+
     enum RootTab: Hashable {
         case review
         case decks
+        case ask
         case history
         case settings
     }
@@ -52,6 +56,15 @@ struct RootView: View {
                     Label("牌组", systemImage: "square.stack.3d.up")
                 }
                 .tag(RootTab.decks)
+
+            AskView(
+                onOpenSettings: { selection = .settings },
+                onOpenHistory: { showAskHistory = true }
+            )
+            .tabItem {
+                Label("提问", systemImage: "bubble.left.and.bubble.right")
+            }
+            .tag(RootTab.ask)
 
             HistoryView()
                 .tabItem {
@@ -71,6 +84,9 @@ struct RootView: View {
         }
         .sheet(item: $incoming, onDismiss: handleInboxAfterDismiss) { pending in
             ImportView(prefilled: pending)
+        }
+        .sheet(isPresented: $showAskHistory) {
+            AskHistoryView()
         }
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView()

@@ -43,7 +43,8 @@ final class CardStore: ObservableObject {
         let schema = Schema([
             ReviewDeck.self,
             ReviewCard.self,
-            CardDisplayRecord.self
+            CardDisplayRecord.self,
+            AskThread.self
         ])
 
         // 顺序很重要：先落日志，再碰 App Group。
@@ -129,6 +130,7 @@ final class CardStore: ObservableObject {
         pageCount: Int,
         summary: String?,
         language: String?,
+        sourceText: String? = nil,
         cards: [AnalysisDocument.CardItem]
     ) throws -> UUID {
         let deck = ReviewDeck(
@@ -137,7 +139,8 @@ final class CardStore: ObservableObject {
             sourceKind: sourceKind,
             pageCount: pageCount,
             summary: summary,
-            language: language
+            language: language,
+            sourceText: ReviewDeck.clippedSourceText(sourceText ?? "")
         )
         context.insert(deck)
 
@@ -149,7 +152,8 @@ final class CardStore: ObservableObject {
                 tags: item.tags ?? [],
                 sourcePage: item.sourcePage,
                 difficulty: ReviewCard.clampScore(item.difficulty ?? 3),
-                importance: ReviewCard.clampScore(item.importance ?? 3)
+                importance: ReviewCard.clampScore(item.importance ?? 3),
+                origin: ReviewCard.Origin.analysis
             )
             card.deck = deck
             context.insert(card)
@@ -158,6 +162,105 @@ final class CardStore: ObservableObject {
         try save()
         try refreshRotationCache()
         return deck.id
+    }
+
+    /// 往已有牌组里插入一张卡片。返回新卡片的 ID。
+    ///
+    /// 与 `insertDeck` 的区别只是「不新建牌组」，但物化缓存那一步不能省：
+    /// 新卡片必须立刻进入轮换池，否则用户保存完在复习页看不到它。
+    @discardableResult
+    func insertCard(
+        into deck: ReviewDeck,
+        question: String,
+        answer: String,
+        detail: String? = nil,
+        tags: [String] = [],
+        sourcePage: Int? = nil,
+        difficulty: Int = 3,
+        importance: Int = 3,
+        origin: String = ReviewCard.Origin.manual
+    ) throws -> UUID {
+        let card = ReviewCard(
+            question: question.trimmingCharacters(in: .whitespacesAndNewlines),
+            answer: answer.trimmingCharacters(in: .whitespacesAndNewlines),
+            detail: detail,
+            tags: tags,
+            sourcePage: sourcePage,
+            difficulty: difficulty,
+            importance: importance,
+            origin: origin
+        )
+        card.deck = deck
+        context.insert(card)
+        deck.updatedAt = Date()
+
+        try save()
+        try refreshRotationCache()
+        return card.id
+    }
+
+    /// 保存一次提问记录。返回记录 ID。
+    @discardableResult
+    func insertAskThread(
+        question: String,
+        answer: String,
+        worthSaving: Bool,
+        reason: String?,
+        deckID: UUID?,
+        deckTitle: String?,
+        draft: AnalysisDocument.CardItem?
+    ) throws -> UUID {
+        let thread = AskThread(
+            question: question,
+            answer: answer,
+            worthSaving: worthSaving,
+            reason: reason,
+            deckID: deckID,
+            deckTitle: deckTitle
+        )
+        thread.setDraft(draft)
+        context.insert(thread)
+        try save()
+        return thread.id
+    }
+
+    /// 把提问记录标记为「已保存成卡片」。
+    func markThreadSaved(_ thread: AskThread, cardID: UUID) throws {
+        thread.savedCardID = cardID
+        try save()
+    }
+
+    /// 按 ID 标记「已保存」。界面只持有 ID，不必为了拿到对象再查一次全部记录。
+    func markThreadSaved(threadID: UUID, cardID: UUID) throws {
+        var descriptor = FetchDescriptor<AskThread>(
+            predicate: #Predicate<AskThread> { $0.id == threadID }
+        )
+        descriptor.fetchLimit = 1
+        guard let thread = (try? context.fetch(descriptor))?.first else { return }
+        thread.savedCardID = cardID
+        try save()
+    }
+
+    func askThread(withID id: UUID) -> AskThread? {
+        var descriptor = FetchDescriptor<AskThread>(
+            predicate: #Predicate<AskThread> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return (try? context.fetch(descriptor))?.first
+    }
+
+    /// 最近的提问记录，新的在前。
+    func askThreads(limit: Int = 100) -> [AskThread] {
+        var descriptor = FetchDescriptor<AskThread>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = max(1, limit)
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    func delete(askThread: AskThread) throws {
+        context.delete(askThread)
+        try save()
     }
 
     /// 删除牌组（级联删除卡片与展示记录）。

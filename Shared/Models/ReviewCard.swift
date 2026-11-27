@@ -39,6 +39,16 @@ final class ReviewCard {
 
     var createdAt: Date
 
+    /// 卡片来源："analysis"（导入 PDF 后由 AI 分析产生）、"ask"（用户在提问页问出来、
+    /// 又确认值得做成卡片）、"manual"（用户手工新建）。
+    ///
+    /// 带默认值，SwiftData 走轻量迁移；旧库里已有的卡片解出来就是 "analysis"，
+    /// 这正是它们的事实来源，所以不需要额外的迁移代码。
+    ///
+    /// 刻意**不**进 `CardSnapshot`：小组件只关心「显示什么」，不关心卡片从哪来，
+    /// 多带一个字段等于让 Widget 也参与迁移。
+    var origin: String = ReviewCard.Origin.analysis
+
     /// 所属牌组。
     var deck: ReviewDeck?
 
@@ -56,7 +66,8 @@ final class ReviewCard {
         difficulty: Int = 3,
         importance: Int = 3,
         isFavorite: Bool = false,
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        origin: String = ReviewCard.Origin.analysis
     ) {
         self.id = id
         self.question = question
@@ -68,6 +79,7 @@ final class ReviewCard {
         self.importance = ReviewCard.clampScore(importance)
         self.isFavorite = isFavorite
         self.createdAt = createdAt
+        self.origin = origin
         self.displays = []
     }
 
@@ -75,6 +87,30 @@ final class ReviewCard {
     static func clampScore(_ value: Int) -> Int {
         min(5, max(1, value))
     }
+}
+
+// MARK: - 来源
+
+extension ReviewCard {
+    /// 卡片来源的取值。用字符串而不是 enum，是因为 SwiftData 对 String 字段的
+    /// 迁移最省事，而 enum 需要额外写 Codable 映射。
+    enum Origin {
+        static let analysis = "analysis"
+        static let ask = "ask"
+        static let manual = "manual"
+
+        /// 给界面用的中文说明。未知值一律当「分析」处理，避免旧数据出现空白。
+        static func label(for raw: String) -> String {
+            switch raw {
+            case ask: return "提问"
+            case manual: return "手工"
+            default: return "分析"
+            }
+        }
+    }
+
+    /// 是否来自提问。界面上用它决定要不要显示角标。
+    var isFromAsk: Bool { origin == Origin.ask }
 }
 
 // MARK: - 转换

@@ -277,6 +277,15 @@ struct DeckDetailView: View {
                 }
                 Text("难度 \(card.difficulty)")
                 Text("重要度 \(card.importance)")
+                // 提问来的卡片值得区分：用户看到「提问」就知道这是自己问出来的，
+                // 而不是文档里本来就有的。手工加的也标出来，同上。
+                if card.origin != ReviewCard.Origin.analysis {
+                    Label(
+                        ReviewCard.Origin.label(for: card.origin),
+                        systemImage: card.isFromAsk ? "bubble.left" : "square.and.pencil"
+                    )
+                    .labelStyle(.titleAndIcon)
+                }
             }
             .font(.caption2)
             .foregroundStyle(.tertiary)

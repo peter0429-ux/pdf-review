@@ -8,16 +8,28 @@
 
 ## [未发布]
 
-### 移除
-- **内置示例内容换成无版权归属的自制牌组**。原先随包的 93 张卡片来自一份第三方讲义 PDF，在开源前被移除（连同 git 历史里的旧路径一起清理）。现在的内置内容是 24 张「iOS 内存管理」卡片，由项目自己编写。
+### 新增
+- **提问功能**：新增第五个标签页「提问」。选一份牌组提问，AI 先回答，再判断这个知识点值不值得做成复习卡片；值得时给一张可编辑的草稿，用户改完点一下就进了轮换池。
+  - `AIClient.ask(...)` 与 `AskResult`（`answer` / `worthSaving` / `reason` / `draft`）。
+  - `AskThread` 模型与 `CardStore` 的 `insertAskThread` / `markThreadSaved` / `askThread(withID:)` / `askThreads(limit:)` / `delete(askThread:)`。
+  - 新增 `AskView`、`AskHistoryView`（按天分组、滑动删除、详情页）、`AskBubbleView`、`CardDraftView`。
+  - 牌组详情页给非分析来源的卡片加「提问 / 手工」角标。
+- **牌组保存原文**：`ReviewDeck.sourceText` 存前 40 000 字，作为提问时的上下文。导入 PDF 生成的牌组才有；早先导入的牌组没有原文，提问页会明确告知。
+- **卡片记录来源**：`ReviewCard.origin`（`analysis` / `ask` / `manual`），带默认值 `"analysis"`，老库可轻量迁移。
 
 ### 变更
+- `AIClient.analyze` 的进度回调从 `(Double) -> Void` 换成 `(AnalysisProgress) -> Void`（上一版已做，这里补记）。
+- **内置示例内容换成无版权归属的自制牌组**。原先随包的 93 张卡片来自一份第三方讲义 PDF，在开源前被移除（连同 git 历史里的旧路径一起清理）。现在的内置内容是 24 张「iOS 内存管理」卡片，由项目自己编写。
 - 内置资源改名，避免与运行时缓存混淆：
   - `PdfReview/Resources/seed-analysis.pdfreview.json` → `bundled-deck.pdfreview.json`
   - `PdfReviewWidget/Resources/rotation-cache.json` → `bundled-wheel.json`
   - `rotation-cache.json` 这个名字**只**指 App 运行时写进 App Group 容器的那份缓存。
 - 设置页的「内置内容」不再硬编码牌组名，改为从内置缓存里读真实标题与卡片数。
 - 仓库开源配套：MIT `LICENSE`、`CONTRIBUTING.md`、本文件；README 增加「AI 编写」与「App Groups 必须开启 / 植入方法」两节。
+
+### 说明
+- **`AskThread` 刻意不建 SwiftData 关系**。卡片会被删、会被移到别的牌组；用 `@Relationship` 要么级联删掉提问历史，要么把 `savedCardID` 置空，两种都不对。留一个普通 `UUID` 字段，历史独立存活。
+- **`worthSaving` 与 `draft` 必须同时成立**。模型说「值得」却给不出可解析的卡（字段缺失、被截成空串）时，按不值得处理——否则用户点保存才发现是空卡。这条在 `AIClient.decodeAskResult` 里强制，不信任模型的自我声明。
 
 ---
 
