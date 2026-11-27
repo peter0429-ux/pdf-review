@@ -5,6 +5,8 @@
 
 顶栏、列表、预览各自是独立的小控件（`deck_list.py` / `preview.py`），
 这里只负责把它们拼起来、把事件转给业务层。
+
+所有尺寸都是设计像素，落笔前过 `theme.px()`。
 """
 
 from __future__ import annotations
@@ -16,17 +18,16 @@ from tkinter import filedialog, messagebox
 from typing import Optional
 
 from core import export as export_mod
+from core import settings as settings_mod
 from core.cards import AnalysisDocument
 from core.project import DeckEntry, DeckStore
 
-from . import theme
+from . import dpi, theme
 from .analyze_dialog import AnalyzeDialog
 from .deck_list import DeckList
 from .preview import CardPreview
 from .settings_dialog import SettingsDialog
 from .widgets import Divider, RoundedButton, round_rect
-
-from core import settings as settings_mod
 
 
 class MainWindow(tk.Frame):
@@ -75,17 +76,27 @@ class MainWindow(tk.Frame):
             body,
             orient="horizontal",
             background=theme.BG,
-            sashwidth=10,
+            sashwidth=theme.px(10),
             sashrelief="flat",
             bd=0,
         )
-        panes.pack(fill="both", expand=True, padx=theme.PAD_L, pady=(theme.PAD_M, 0))
+        panes.pack(
+            fill="both",
+            expand=True,
+            padx=theme.px(theme.PAD_L),
+            pady=(theme.px(theme.PAD_M), 0),
+        )
 
         left_card = _panel(panes)
-        panes.add(left_card, minsize=230, width=330, stretch="always")
+        panes.add(
+            left_card,
+            minsize=theme.px(230),
+            width=theme.px(330),
+            stretch="always",
+        )
 
         right_card = _panel(panes)
-        panes.add(right_card, minsize=360, stretch="always")
+        panes.add(right_card, minsize=theme.px(360), stretch="always")
 
         self._list = DeckList(
             left_card.inner,  # type: ignore[attr-defined]
@@ -102,16 +113,28 @@ class MainWindow(tk.Frame):
 
     def _build_header(self) -> None:
         header = tk.Frame(self, background=theme.BG)
-        header.pack(fill="x", padx=theme.PAD_L, pady=(theme.PAD_M, theme.PAD_M))
+        header.pack(
+            fill="x",
+            padx=theme.px(theme.PAD_L),
+            pady=(theme.px(theme.PAD_M), theme.px(theme.PAD_M)),
+        )
 
         brand = tk.Frame(header, background=theme.BG)
         brand.pack(side="left")
 
         # 标题左边放一个小小的圆角方块当 logo，纯装饰。
-        mark = tk.Canvas(brand, width=26, height=26, background=theme.BG, highlightthickness=0, bd=0)
-        mark.pack(side="left", padx=(0, 9))
-        round_rect(mark, 0, 0, 26, 26, 8, fill=theme.ACCENT, outline=theme.ACCENT)
-        mark.create_text(13, 14, text="R", fill="#FFFFFF", font=self._fonts["body_bold"])
+        logo = theme.px(26)
+        mark = tk.Canvas(
+            brand,
+            width=logo,
+            height=logo,
+            background=theme.BG,
+            highlightthickness=0,
+            bd=0,
+        )
+        mark.pack(side="left", padx=(0, theme.px(9)))
+        round_rect(mark, 0, 0, logo, logo, theme.px(8), fill=theme.ACCENT, outline=theme.ACCENT)
+        mark.create_text(logo / 2, logo / 2 + 1, text="R", fill="#FFFFFF", font=self._fonts["body_bold"])
 
         titles = tk.Frame(brand, background=theme.BG)
         titles.pack(side="left")
@@ -138,18 +161,18 @@ class MainWindow(tk.Frame):
 
         RoundedButton(
             actions, "设置", self._on_settings, self._fonts, variant="ghost"
-        ).pack(side="right", padx=(6, 0))
+        ).pack(side="right", padx=(theme.px(6), 0))
 
         self._export_button = RoundedButton(
             actions, "导出给 iPhone", self._on_export, self._fonts, variant="primary"
         )
-        self._export_button.pack(side="right", padx=(6, 0))
+        self._export_button.pack(side="right", padx=(theme.px(6), 0))
         self._export_button.set_enabled(False)
 
         self._delete_button = RoundedButton(
             actions, "删除", self._on_delete, self._fonts, variant="danger"
         )
-        self._delete_button.pack(side="right", padx=(6, 0))
+        self._delete_button.pack(side="right", padx=(theme.px(6), 0))
         self._delete_button.set_enabled(False)
 
         RoundedButton(
@@ -157,9 +180,9 @@ class MainWindow(tk.Frame):
         ).pack(side="right")
 
     def _build_footer(self) -> None:
-        Divider(self, background=theme.BORDER).pack(fill="x", pady=(theme.PAD_M, 0))
+        Divider(self, background=theme.BORDER).pack(fill="x", pady=(theme.px(theme.PAD_M), 0))
         footer = tk.Frame(self, background=theme.BG)
-        footer.pack(fill="x", padx=theme.PAD_L, pady=(7, 9))
+        footer.pack(fill="x", padx=theme.px(theme.PAD_L), pady=(theme.px(7), theme.px(9)))
 
         self._footer = tk.Label(
             footer,
@@ -305,19 +328,25 @@ def _panel(parent: tk.Misc) -> tk.Frame:
     """
     shell: tk.Frame = tk.Frame(parent, background=theme.BORDER, bd=0, highlightthickness=0)
     inner = tk.Frame(shell, background=theme.SURFACE, bd=0, highlightthickness=0)
-    inner.pack(fill="both", expand=True, padx=1, pady=1)
+    edge = max(1, theme.px(1))
+    inner.pack(fill="both", expand=True, padx=edge, pady=edge)
     shell.inner = inner  # type: ignore[attr-defined]
     return shell
 
 
 def run() -> None:
     """程序入口。"""
+    # 必须在 tk.Tk() 之前：窗口一旦建出来，缩放模式就定下了。
+    dpi.enable()
+
     root = tk.Tk()
     root.title("PDF 复习")
-    root.geometry("1060x700")
-    root.minsize(880, 560)
 
     fonts = theme.apply_theme(root)
+    # 尺寸在 apply_theme 之后算：那时才知道 SCALE 是多少
+    root.geometry(f"{theme.px(1060)}x{theme.px(700)}")
+    root.minsize(theme.px(880), theme.px(560))
+
     MainWindow(root, fonts)
 
     root.update_idletasks()

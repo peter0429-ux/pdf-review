@@ -6,6 +6,10 @@ ttk 在 Windows 上只有 `vista` 一套像样的主题，而它把背景色、�
 
 这个文件里都是「画出来」的控件，没有业务含义。它们对外只暴露很少的方法，
 免得把 Tk 的细节漏到界面代码里。
+
+尺寸一律是「100% 屏幕下的设计像素」，真正落笔前过一遍 `theme.px()`。
+构造函数里的高度/尺寸参数默认值不能写成 `theme.px(34)`——默认参数在
+import 时就求值了，那时候还没量过屏幕。
 """
 
 from __future__ import annotations
@@ -15,7 +19,7 @@ import tkinter.font as tkfont
 from tkinter import ttk
 from typing import Callable, Optional
 
-from . import theme
+from . import anim, theme
 
 
 def round_rect(
@@ -76,7 +80,12 @@ class ScrollArea(tk.Frame):
         # width/height 给的是「最小请求尺寸」，真正的尺寸由 pack 决定。
         # 不给的话 Canvas 默认 378 宽，会把窗格撑得比窗口还宽。
         self.canvas = tk.Canvas(
-            self, background=background, highlightthickness=0, bd=0, width=80, height=80
+            self,
+            background=background,
+            highlightthickness=0,
+            bd=0,
+            width=theme.px(80),
+            height=theme.px(80),
         )
         self._bar = ttk.Scrollbar(
             self, orient="vertical", command=self.canvas.yview, style="Vertical.TScrollbar"
@@ -151,6 +160,9 @@ class RoundedButton(tk.Canvas):
 
     ttk.Button 在 clam 主题下是方的、灰的；在 vista 主题下不接受自定义
     颜色。想让「新建牌组」看起来像主操作，只能自己画。
+
+    悬停与按下时填充色是渐变过去的，不是瞬间跳变——瞬间跳变会让人觉得
+    界面在「闪」而不是「响应」。
     """
 
     _PADDING_X = 14
@@ -163,7 +175,7 @@ class RoundedButton(tk.Canvas):
         fonts: dict[str, tkfont.Font],
         variant: str = "secondary",
         width: Optional[int] = None,
-        height: int = theme.BUTTON_HEIGHT,
+        height: Optional[int] = None,
         background: str = theme.BG,
     ) -> None:
         self._font = fonts["body"]
@@ -175,16 +187,23 @@ class RoundedButton(tk.Canvas):
         self._pressed = False
         self._background = background
 
-        measured = self._font.measure(text) + self._PADDING_X * 2
+        pad = theme.px(self._PADDING_X)
+        self._height = height if height is not None else theme.px(theme.BUTTON_HEIGHT)
+        measured = self._font.measure(text) + pad * 2
+
         super().__init__(
             master,
             width=width or measured,
-            height=height,
+            height=self._height,
             background=background,
             highlightthickness=0,
             bd=0,
             cursor="hand2",
         )
+
+        #: 当前实际填充色。动画在它和 `_palette()` 给的目标色之间插值，
+        #: 插值过程中 `_draw()` 就用这个值。
+        self._fill = self._palette()[0]
 
         self.bind("<Configure>", lambda _e: self._draw())
         self.bind("<Enter>", self._on_enter)
@@ -198,7 +217,8 @@ class RoundedButton(tk.Canvas):
         if text == self._text:
             return
         self._text = text
-        self.configure(width=self._font.measure(text) + self._PADDING_X * 2)
+        pad = theme.px(self._PADDING_X)
+        self.configure(width=self._font.measure(text) + pad * 2)
         self._draw()
 
     def set_enabled(self, enabled: bool) -> None:
@@ -206,13 +226,13 @@ class RoundedButton(tk.Canvas):
             return
         self._enabled = enabled
         self.configure(cursor="hand2" if enabled else "arrow")
-        self._draw()
+        self._refresh(animate=False)
 
     def set_variant(self, variant: str) -> None:
         if variant == self._variant:
             return
         self._variant = variant
-        self._draw()
+        self._refresh(animate=False)
 
     # -- 外观 ------------------------------------------------------------
 
@@ -222,33 +242,70 @@ class RoundedButton(tk.Canvas):
         if self._variant == "primary":
             if disabled:
                 return theme.ACCENT_SOFT, theme.ACCENT_SOFT, "#9DAEE0", theme.ACCENT_SOFT
-            fill = theme.ACCENT_DARK if self._pressed else (theme.ACCENT_DARK if self._hover else theme.ACCENT)
-            return fill, fill, "#FFFFFF", fill
+            fill = theme.ACCENT_DARK if (self._pressed or self._hover) else theme.ACCENT
+            return fill, fill, "#FFFFFF", theme.ACCENT_DARK
         if self._variant == "danger":
             if disabled:
                 return self._background, self._background, "#CDB4B0", self._background
             fill = theme.ERROR_SOFT if self._hover else self._background
-            return fill, fill, theme.ERROR, fill
+            return fill, fill, theme.ERROR, theme.ERROR_SOFT
         if self._variant == "ghost":
             if disabled:
                 return self._background, self._background, "#BFC4CF", self._background
             fill = theme.HOVER if self._hover else self._background
-            return fill, fill, theme.TEXT_SOFT, fill
+            return fill, fill, theme.TEXT_SOFT, theme.HOVER
         # secondary
         if disabled:
             return theme.SURFACE_ALT, theme.BORDER, "#BFC4CF", theme.SURFACE_ALT
         fill = theme.HOVER if self._hover else theme.SURFACE
-        return fill, theme.BORDER_STRONG, theme.TEXT, fill
+        return fill, theme.BORDER_STRONG, theme.TEXT, theme.HOVER
+
+    def _refresh(self, animate: bool = True) -> None:
+        """把填充色挪到当前状态对应的目标色上。"""
+        target, _, _, _ = self._palette()
+        if target == self._fill:
+            self._draw()
+            return
+        if not animate or anim.reduce_motion():
+            self._fill = target
+            self._draw()
+            return
+
+        start = self._fill
+        filled = {"done": False}
+
+        def frame(t: float) -> None:
+            self._fill = anim.lerp_color(start, target, t)
+
+        def finish() -> None:
+            filled["done"] = True
+            self._fill = target
+            self._draw()
+
+        anim.animate(self, 120, frame, on_done=finish)
+        # 首帧要立刻画一次，否则等下一条 after 回调才有变化，看起来像卡了一下
+        self._draw()
 
     def _draw(self) -> None:
         self.delete("all")
         width = self.winfo_width() or int(self["width"])
-        height = self.winfo_height() or int(self["height"])
+        height = self.winfo_height() or self._height
         if width <= 1 or height <= 1:
             return
 
-        fill, outline, text_color, _ = self._palette()
-        round_rect(self, 1, 1, width - 1, height - 1, 7, fill=fill, outline=outline, width=1)
+        _, outline, text_color, _ = self._palette()
+        fill = self._fill
+        round_rect(
+            self,
+            1,
+            1,
+            width - 1,
+            height - 1,
+            theme.px(7),
+            fill=fill,
+            outline=outline,
+            width=1,
+        )
         self.create_text(
             width / 2,
             height / 2 + 1,
@@ -261,23 +318,23 @@ class RoundedButton(tk.Canvas):
 
     def _on_enter(self, _event: tk.Event) -> None:
         self._hover = True
-        self._draw()
+        self._refresh()
 
     def _on_leave(self, _event: tk.Event) -> None:
         self._hover = False
         self._pressed = False
-        self._draw()
+        self._refresh()
 
     def _on_press(self, _event: tk.Event) -> None:
         if not self._enabled:
             return
         self._pressed = True
-        self._draw()
+        self._refresh()
 
     def _on_release(self, _event: tk.Event) -> None:
         was_pressed = self._pressed
         self._pressed = False
-        self._draw()
+        self._refresh()
         if self._enabled and was_pressed:
             self._command()
 
@@ -293,22 +350,22 @@ class Chip(tk.Canvas):
         foreground: str = theme.TEXT_SOFT,
         background: str = theme.SURFACE_ALT,
         parent_background: str = theme.SURFACE,
-        height: int = 21,
+        height: Optional[int] = None,
     ) -> None:
         self._font = font
         self._text = text
-        width = font.measure(text) + 16
+        self._height = height if height is not None else theme.px(21)
+        width = font.measure(text) + theme.px(16)
         super().__init__(
             master,
             width=width,
-            height=height,
+            height=self._height,
             background=parent_background,
             highlightthickness=0,
             bd=0,
         )
         self._foreground = foreground
         self._chip_background = background
-        self._height = height
         self.bind("<Configure>", lambda _e: self._draw())
         self._draw()
 
@@ -328,7 +385,9 @@ class Chip(tk.Canvas):
             fill=self._chip_background,
             outline=self._chip_background,
         )
-        self.create_text(width / 2, height / 2 + 1, text=self._text, fill=self._foreground, font=self._font)
+        self.create_text(
+            width / 2, height / 2 + 1, text=self._text, fill=self._foreground, font=self._font
+        )
 
 
 class IndexBadge(tk.Canvas):
@@ -340,19 +399,19 @@ class IndexBadge(tk.Canvas):
         number: int,
         font: tkfont.Font,
         parent_background: str = theme.SURFACE,
-        size: int = 24,
+        size: Optional[int] = None,
     ) -> None:
+        self._size = size if size is not None else theme.px(24)
         super().__init__(
             master,
-            width=size,
-            height=size,
+            width=self._size,
+            height=self._size,
             background=parent_background,
             highlightthickness=0,
             bd=0,
         )
         self._number = number
         self._font = font
-        self._size = size
         self.bind("<Configure>", lambda _e: self._draw())
         self._draw()
 
@@ -375,4 +434,10 @@ class Divider(tk.Frame):
     """一条淡分隔线。Tk 的 Separator 在 clam 下是凹槽，看着脏。"""
 
     def __init__(self, master: tk.Misc, background: str = theme.BORDER) -> None:
-        super().__init__(master, background=background, height=1, bd=0, highlightthickness=0)
+        super().__init__(
+            master,
+            background=background,
+            height=max(1, theme.px(1)),
+            bd=0,
+            highlightthickness=0,
+        )

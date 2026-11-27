@@ -51,6 +51,38 @@ PAD_M = 12
 PAD_L = 18
 PAD_XL = 28
 
+# -- 缩放 ---------------------------------------------------------------
+
+#: 屏幕缩放系数。下面的间距、行高、圆角半径都是「100% 屏幕下的设计像素」，
+#: 实际取值一律过一遍 `px()`。
+#:
+#: 为什么必须有这个：一旦声明了 DPI 感知（`dpi.py`），Tk 的字体按点数会
+#: 自动放大（10pt 在 150% 屏上变成 20 物理像素），但 `padding=12` 这类
+#: 整数永远是 12 物理像素。不缩放的话字变大了、间距没变，界面会挤成一团。
+SCALE: float = 1.0
+
+
+def init_scale(root: Any) -> float:
+    """量出屏幕缩放系数并记下来。必须在建任何控件之前调用。
+
+    `winfo_fpixels("1i")` 返回「一英寸有多少像素」。DPI 感知打开后，
+    150% 缩放下这个值是 144；未声明 DPI 感知时永远是 96（系统在窗口
+    外面偷偷拉伸）。所以它同时也是一把「DPI 感知生效了没」的尺子。
+    """
+    global SCALE
+    try:
+        ppi = float(root.winfo_fpixels("1i"))
+    except Exception:  # noqa: BLE001
+        ppi = 96.0
+    SCALE = max(1.0, ppi / 96.0)
+    return SCALE
+
+
+def px(value: float) -> int:
+    """把设计像素换算成当前屏幕的实际像素。"""
+    return int(round(value * SCALE))
+
+
 # -- 字号 ---------------------------------------------------------------
 
 H1_SIZE = 19
@@ -100,7 +132,11 @@ def apply_theme(root: Any) -> dict[str, tkfont.Font]:
     """
     from tkinter import ttk
 
+    # 先量缩放，再建字体：字体按点数走，缩放系数由 Tk 自己管；间距是
+    # 物理像素，必须我们手动乘。顺序反了的话第一帧会按 100% 排好再跳一下。
+    init_scale(root)
     fonts = load_fonts(root)
+
     style = ttk.Style(root)
     style.theme_use("clam")
 
@@ -124,7 +160,7 @@ def apply_theme(root: Any) -> dict[str, tkfont.Font]:
         bordercolor=SURFACE,
         arrowcolor=SURFACE,
         relief="flat",
-        width=9,
+        width=px(9),
     )
     style.map(
         "Vertical.TScrollbar",
@@ -133,8 +169,9 @@ def apply_theme(root: Any) -> dict[str, tkfont.Font]:
         lightcolor=[("active", MUTED)],
     )
 
-    style.configure("TCombobox", font=fonts["body"], padding=4)
-    style.configure("TSpinbox", font=fonts["body"], padding=4)
+    style.configure("TEntry", padding=px(6), fieldbackground=SURFACE)
+    style.configure("TCombobox", font=fonts["body"], padding=px(4))
+    style.configure("TSpinbox", font=fonts["body"], padding=px(4))
     style.configure(
         "Horizontal.TProgressbar",
         background=ACCENT,
@@ -143,7 +180,7 @@ def apply_theme(root: Any) -> dict[str, tkfont.Font]:
         lightcolor=ACCENT,
         darkcolor=ACCENT,
         borderwidth=0,
-        thickness=6,
+        thickness=px(6),
     )
 
     return fonts

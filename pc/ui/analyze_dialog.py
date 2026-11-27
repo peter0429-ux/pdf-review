@@ -2,6 +2,8 @@
 
 这个窗口承担了整个程序最重的一段流程，所以它自己管一个 `Worker`，
 关窗时要把后台任务取消掉——不然用户关掉窗口、程序还在后台静静烧 token。
+
+尺寸都是设计像素，落笔前过 `theme.px()`。
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from core import settings as settings_mod
 from core.extract import SUPPORTED_SUFFIXES, ExtractError, Extraction, extract
 from core.project import DeckMeta, DeckStore
 
-from . import theme
+from . import anim, theme
 from .widgets import Divider, RoundedButton
 from .worker import Worker
 
@@ -37,9 +39,11 @@ _FILE_TYPES = [
 class _Section:
     """带序号的小标题。三步流程用它分段，眼睛好找位置。"""
 
-    def __init__(self, parent: tk.Misc, fonts: dict[str, tkfont.Font], index: str, title: str) -> None:
+    def __init__(
+        self, parent: tk.Misc, fonts: dict[str, tkfont.Font], index: str, title: str
+    ) -> None:
         row = tk.Frame(parent, background=theme.SURFACE)
-        row.pack(fill="x", pady=(0, theme.PAD_XS))
+        row.pack(fill="x", pady=(0, theme.px(theme.PAD_XS)))
 
         tk.Label(
             row,
@@ -48,14 +52,14 @@ class _Section:
             foreground=theme.ACCENT,
             background=theme.ACCENT_SOFT,
             width=2,
-        ).pack(side="left", ipady=1)
+        ).pack(side="left", ipady=theme.px(1))
         tk.Label(
             row,
             text=title,
             font=fonts["h2"],
             foreground=theme.TEXT,
             background=theme.SURFACE,
-        ).pack(side="left", padx=(theme.PAD_S, 0))
+        ).pack(side="left", padx=(theme.px(theme.PAD_S), 0))
 
 
 class AnalyzeDialog(tk.Toplevel):
@@ -71,7 +75,7 @@ class AnalyzeDialog(tk.Toplevel):
         super().__init__(master)
         self.title("新建牌组")
         self.configure(background=theme.SURFACE)
-        self.minsize(600, 440)
+        self.minsize(theme.px(600), theme.px(440))
         self.transient(master)
 
         self.created_folder: Optional[Path] = None
@@ -82,6 +86,9 @@ class AnalyzeDialog(tk.Toplevel):
         self._extraction: Optional[Extraction] = None
         self._source_path: Optional[Path] = None
         self._closed = False
+        #: 进度条当前显示的数值。动画在它和目标值之间插值，
+        #: 否则模型一块一块回来时进度条是一跳一跳的。
+        self._shown_progress = 0.0
 
         self._path_text = tk.StringVar(value="还没有选文件")
         self._title = tk.StringVar(value="")
@@ -95,23 +102,35 @@ class AnalyzeDialog(tk.Toplevel):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.bind("<Escape>", lambda _e: self._on_close())
 
+        self.after(10, lambda: anim.fade_in_window(self))
+
     # -- 构建 ------------------------------------------------------------
 
     def _build(self) -> None:
-        body = tk.Frame(self, background=theme.SURFACE, padx=theme.PAD_XL, pady=theme.PAD_L)
+        body = tk.Frame(
+            self,
+            background=theme.SURFACE,
+            padx=theme.px(theme.PAD_XL),
+            pady=theme.px(theme.PAD_L),
+        )
         body.pack(fill="both", expand=True)
 
         # 1. 选文件
         _Section(body, self._fonts, "1", "选一份文件")
         picker = tk.Frame(body, background=theme.SURFACE)
-        picker.pack(fill="x", pady=(theme.PAD_S, 0))
+        picker.pack(fill="x", pady=(theme.px(theme.PAD_S), 0))
         ttk.Entry(picker, textvariable=self._path_text, state="readonly").pack(
-            side="left", fill="x", expand=True, ipady=4
+            side="left", fill="x", expand=True, ipady=theme.px(4)
         )
         self._pick_button = RoundedButton(
-            picker, text="选文件…", variant="secondary", fonts=self._fonts, background=theme.SURFACE, command=self._on_pick
+            picker,
+            text="选文件…",
+            variant="secondary",
+            fonts=self._fonts,
+            background=theme.SURFACE,
+            command=self._on_pick,
         )
-        self._pick_button.pack(side="left", padx=(theme.PAD_S, 0))
+        self._pick_button.pack(side="left", padx=(theme.px(theme.PAD_S), 0))
 
         # 用「 / 」分隔并留空格：Tk 只在空格处断行，中文连排会被当成一个
         # 超长单词整段挪到下一行，前面只剩「支持」两个字孤零零一行。
@@ -123,8 +142,8 @@ class AnalyzeDialog(tk.Toplevel):
             background=theme.SURFACE,
             anchor="w",
             justify="left",
-            wraplength=520,
-        ).pack(fill="x", pady=(theme.PAD_XS, 0))
+            wraplength=theme.px(520),
+        ).pack(fill="x", pady=(theme.px(theme.PAD_XS), 0))
         tk.Label(
             body,
             text="扫描件（只有图片、没有文字层的 PDF）读不出来。",
@@ -133,14 +152,14 @@ class AnalyzeDialog(tk.Toplevel):
             background=theme.SURFACE,
             anchor="w",
             justify="left",
-            wraplength=520,
+            wraplength=theme.px(520),
         ).pack(fill="x")
 
         # 2. 牌组名
-        tk.Frame(body, background=theme.SURFACE, height=theme.PAD_M).pack(fill="x")
+        tk.Frame(body, background=theme.SURFACE, height=theme.px(theme.PAD_M)).pack(fill="x")
         _Section(body, self._fonts, "2", "起个名字")
         ttk.Entry(body, textvariable=self._title, font=self._fonts["body"]).pack(
-            fill="x", pady=(theme.PAD_S, 0), ipady=4
+            fill="x", pady=(theme.px(theme.PAD_S), 0), ipady=theme.px(4)
         )
         tk.Label(
             body,
@@ -149,16 +168,20 @@ class AnalyzeDialog(tk.Toplevel):
             foreground=theme.MUTED,
             background=theme.SURFACE,
             anchor="w",
-        ).pack(fill="x", pady=(4, 0))
+        ).pack(fill="x", pady=(theme.px(4), 0))
 
         # 3. 进度
-        tk.Frame(body, background=theme.SURFACE, height=theme.PAD_M).pack(fill="x")
+        tk.Frame(body, background=theme.SURFACE, height=theme.px(theme.PAD_M)).pack(fill="x")
         _Section(body, self._fonts, "3", "开始分析")
 
         self._progress = ttk.Progressbar(
-            body, orient="horizontal", mode="determinate", maximum=1.0, variable=self._progress_value
+            body,
+            orient="horizontal",
+            mode="determinate",
+            maximum=1.0,
+            variable=self._progress_value,
         )
-        self._progress.pack(fill="x", pady=(theme.PAD_S, theme.PAD_XS))
+        self._progress.pack(fill="x", pady=(theme.px(theme.PAD_S), theme.px(theme.PAD_XS)))
 
         tk.Label(
             body,
@@ -176,30 +199,45 @@ class AnalyzeDialog(tk.Toplevel):
             background=theme.SURFACE,
             anchor="w",
             justify="left",
-            wraplength=520,
-        ).pack(fill="x", pady=(4, 0))
+            wraplength=theme.px(520),
+        ).pack(fill="x", pady=(theme.px(4), 0))
 
         Divider(self).pack(fill="x")
 
         # 底部按钮
-        footer = tk.Frame(self, background=theme.SURFACE, padx=theme.PAD_XL, pady=theme.PAD_M)
+        footer = tk.Frame(
+            self,
+            background=theme.SURFACE,
+            padx=theme.px(theme.PAD_XL),
+            pady=theme.px(theme.PAD_M),
+        )
         footer.pack(fill="x", side="bottom")
 
         self._start_button = RoundedButton(
-            footer, text="开始分析", variant="primary", fonts=self._fonts, background=theme.SURFACE, command=self._on_start
+            footer,
+            text="开始分析",
+            variant="primary",
+            fonts=self._fonts,
+            background=theme.SURFACE,
+            command=self._on_start,
         )
         self._start_button.pack(side="right")
         self._cancel_button = RoundedButton(
-            footer, text="取消", variant="ghost", fonts=self._fonts, background=theme.SURFACE, command=self._on_cancel
+            footer,
+            text="取消",
+            variant="ghost",
+            fonts=self._fonts,
+            background=theme.SURFACE,
+            command=self._on_cancel,
         )
-        self._cancel_button.pack(side="right", padx=(0, theme.PAD_S))
+        self._cancel_button.pack(side="right", padx=(0, theme.px(theme.PAD_S)))
 
     def _center_on(self, master: tk.Misc) -> None:
         self.update_idletasks()
         width = self.winfo_width()
         height = self.winfo_height()
         x = master.winfo_rootx() + (master.winfo_width() - width) // 2
-        y = master.winfo_rooty() + max(40, (master.winfo_height() - height) // 3)
+        y = master.winfo_rooty() + max(theme.px(40), (master.winfo_height() - height) // 3)
         self.geometry(f"+{max(0, x)}+{max(0, y)}")
 
     # -- 选文件 ----------------------------------------------------------
@@ -279,6 +317,7 @@ class AnalyzeDialog(tk.Toplevel):
         self._start_button.set_enabled(False)
         self._pick_button.set_enabled(False)
         self._cancel_button.set_text("停止")
+        self._shown_progress = 0.0
         self._progress_value.set(0.0)
         self._progress_text.set("准备中…")
         self._hint.set("")
@@ -302,7 +341,7 @@ class AnalyzeDialog(tk.Toplevel):
         )
 
     def _on_progress(self, progress: analyzer.Progress) -> None:
-        self._progress_value.set(progress.fraction)
+        self._set_progress(progress.fraction)
         bits = [progress.stage]
         if progress.chunk_total:
             bits.append(f"第 {progress.chunk_index}/{progress.chunk_total} 块")
@@ -315,6 +354,25 @@ class AnalyzeDialog(tk.Toplevel):
             if len(preview) > 24:
                 preview = preview[:24] + "…"
             self._hint.set(f"刚出的卡：{preview}")
+
+    def _set_progress(self, target: float) -> None:
+        """把进度条平滑推到目标值。
+
+        每块回来的间隔是几秒到几十秒不等；直接 set 会看到进度条「啪」地
+        跳一截再定住，动画补上中间的过渡。
+        """
+        target = max(0.0, min(1.0, target))
+        start = self._shown_progress
+        if abs(target - start) < 1e-3 or anim.reduce_motion():
+            self._shown_progress = target
+            self._progress_value.set(target)
+            return
+
+        def frame(value: float) -> None:
+            self._shown_progress = value
+            self._progress_value.set(value)
+
+        anim.tween_number(self, start, target, 400, frame)
 
     def _on_done(self, outcome: analyzer.AnalysisOutcome) -> None:
         document = outcome.document

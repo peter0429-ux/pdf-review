@@ -2,6 +2,8 @@
 
 API Key 落地是 DPAPI 加密的（见 `core/settings.py`），所以这里可以放心
 让用户填真实的 key —— 文件被拷到别的机器上也解不开。
+
+尺寸都是设计像素，落笔前过 `theme.px()`。
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ from typing import Optional
 
 from core import ai, settings as settings_mod
 
-from . import theme
+from . import anim, theme
 from .widgets import Divider, RoundedButton
 
 
@@ -34,7 +36,7 @@ class _Field:
         secret: bool = False,
     ) -> None:
         self.frame = tk.Frame(parent, background=theme.SURFACE)
-        self.frame.pack(fill="x", pady=(0, theme.PAD_M))
+        self.frame.pack(fill="x", pady=(0, theme.px(theme.PAD_M)))
 
         tk.Label(
             self.frame,
@@ -43,10 +45,10 @@ class _Field:
             foreground=theme.TEXT_SOFT,
             background=theme.SURFACE,
             anchor="w",
-        ).pack(fill="x", pady=(0, 4))
+        ).pack(fill="x", pady=(0, theme.px(4)))
 
         self.entry = ttk.Entry(self.frame, textvariable=variable, font=fonts["body"])
-        self.entry.pack(fill="x", ipady=6)
+        self.entry.pack(fill="x", ipady=theme.px(6))
         if secret:
             self.entry.configure(show="•")
 
@@ -58,7 +60,7 @@ class _Field:
             background=theme.SURFACE,
             anchor="w",
             justify="left",
-        ).pack(fill="x", pady=(4, 0))
+        ).pack(fill="x", pady=(theme.px(4), 0))
 
 
 class SettingsDialog(tk.Toplevel):
@@ -95,11 +97,18 @@ class SettingsDialog(tk.Toplevel):
         # 打开就把光标放到最需要填的那一格
         target_name = "base" if current.api_key else "key"
         self.after(80, lambda: self._focus(target_name))
+        # 淡入要等窗口已经映射到屏幕上，否则 Tk 可能忽略 -alpha
+        self.after(10, lambda: anim.fade_in_window(self))
 
     # -- 构建 ------------------------------------------------------------
 
     def _build(self) -> None:
-        body = tk.Frame(self, background=theme.SURFACE, padx=theme.PAD_XL, pady=theme.PAD_L)
+        body = tk.Frame(
+            self,
+            background=theme.SURFACE,
+            padx=theme.px(theme.PAD_XL),
+            pady=theme.px(theme.PAD_L),
+        )
         body.pack(fill="both", expand=True)
 
         tk.Label(
@@ -117,7 +126,7 @@ class SettingsDialog(tk.Toplevel):
             foreground=theme.MUTED,
             background=theme.SURFACE,
             anchor="w",
-        ).pack(fill="x", pady=(4, theme.PAD_L))
+        ).pack(fill="x", pady=(theme.px(4), theme.px(theme.PAD_L)))
 
         self._base_field = _Field(
             body,
@@ -148,7 +157,7 @@ class SettingsDialog(tk.Toplevel):
         }
 
         divider = Divider(body)
-        divider.pack(fill="x", pady=(theme.PAD_XS, theme.PAD_M))
+        divider.pack(fill="x", pady=(theme.px(theme.PAD_XS), theme.px(theme.PAD_M)))
 
         cards_row = tk.Frame(body, background=theme.SURFACE)
         cards_row.pack(fill="x")
@@ -160,7 +169,9 @@ class SettingsDialog(tk.Toplevel):
             background=theme.SURFACE,
         ).pack(side="left")
         spin = ttk.Spinbox(cards_row, from_=1, to=12, textvariable=self._cards, width=5)
-        spin.pack(side="left", padx=(theme.PAD_S, theme.PAD_S))
+        spin.pack(
+            side="left", padx=(theme.px(theme.PAD_S), theme.px(theme.PAD_S))
+        )
         tk.Label(
             cards_row,
             text="6 是个稳妥的默认值",
@@ -177,13 +188,18 @@ class SettingsDialog(tk.Toplevel):
             background=theme.SURFACE,
             anchor="w",
             justify="left",
-            wraplength=420,
-        ).pack(fill="x", pady=(4, 0))
+            wraplength=theme.px(420),
+        ).pack(fill="x", pady=(theme.px(4), 0))
 
         self._test_button = RoundedButton(
-            body, text="测试连接", variant="secondary", fonts=self._fonts, background=theme.SURFACE, command=self._on_test
+            body,
+            text="测试连接",
+            variant="secondary",
+            fonts=self._fonts,
+            background=theme.SURFACE,
+            command=self._on_test,
         )
-        self._test_button.pack(anchor="w", pady=(theme.PAD_L, 0))
+        self._test_button.pack(anchor="w", pady=(theme.px(theme.PAD_L), 0))
 
         tk.Label(
             body,
@@ -193,19 +209,34 @@ class SettingsDialog(tk.Toplevel):
             background=theme.SURFACE,
             anchor="w",
             justify="left",
-            wraplength=440,
-        ).pack(fill="x", pady=(theme.PAD_S, 0))
+            wraplength=theme.px(440),
+        ).pack(fill="x", pady=(theme.px(theme.PAD_S), 0))
 
         Divider(self).pack(fill="x")
 
-        footer = tk.Frame(self, background=theme.SURFACE, padx=theme.PAD_XL, pady=theme.PAD_M)
+        footer = tk.Frame(
+            self,
+            background=theme.SURFACE,
+            padx=theme.px(theme.PAD_XL),
+            pady=theme.px(theme.PAD_M),
+        )
         footer.pack(fill="x")
-        RoundedButton(footer, text="保存", variant="primary", fonts=self._fonts, background=theme.SURFACE, command=self._on_save).pack(
-            side="right"
-        )
-        RoundedButton(footer, text="取消", variant="ghost", fonts=self._fonts, background=theme.SURFACE, command=self._on_cancel).pack(
-            side="right", padx=(0, theme.PAD_S)
-        )
+        RoundedButton(
+            footer,
+            text="保存",
+            variant="primary",
+            fonts=self._fonts,
+            background=theme.SURFACE,
+            command=self._on_save,
+        ).pack(side="right")
+        RoundedButton(
+            footer,
+            text="取消",
+            variant="ghost",
+            fonts=self._fonts,
+            background=theme.SURFACE,
+            command=self._on_cancel,
+        ).pack(side="right", padx=(0, theme.px(theme.PAD_S)))
 
     def _focus(self, name: str) -> None:
         """把光标放到某一格。窗口可能已经被关掉了，所以要防一手。"""

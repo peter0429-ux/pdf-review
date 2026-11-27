@@ -4,6 +4,8 @@
 但选中时那整条蓝色（`vista` 主题下还会带上系统高亮）跟这套配色冲突，
 而且它不支持「左边一条竖线表示选中」这种标记。一屏最多几十个牌组，
 逐个画 Frame 的开销可以忽略。
+
+所有尺寸都是设计像素，落笔前过 `theme.px()`。
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from typing import Callable, Optional
 
 from core.project import DeckEntry
 
-from . import theme
+from . import anim, theme
 from .widgets import ScrollArea, bind_recursive
 
 
@@ -30,7 +32,9 @@ class DeckRow(tk.Frame):
         on_click: Callable[[], None],
         on_double_click: Callable[[], None],
     ) -> None:
-        super().__init__(master, background=theme.SURFACE, height=theme.ROW_HEIGHT)
+        super().__init__(
+            master, background=theme.SURFACE, height=theme.px(theme.ROW_HEIGHT)
+        )
         self.pack_propagate(False)
 
         self._entry = entry
@@ -38,14 +42,25 @@ class DeckRow(tk.Frame):
         self._on_double_click = on_double_click
         self._selected = False
         self._hover = False
+        #: 当前背景色（动画过程中的中间值）。选中/悬停前先用它画，
+        #: 动画再把它推过去。
+        self._background = theme.SURFACE
 
-        # 选中标记：左边一条 3px 的竖条。没选中时也占位（画成底色），
+        # 选中标记：左边一条竖线。没选中时也占位（画成底色），
         # 这样切换时文字不会左右挪一下。
-        self._marker = tk.Frame(self, width=3, background=theme.SURFACE)
+        self._marker = tk.Frame(
+            self, width=theme.px(3), background=theme.SURFACE
+        )
         self._marker.pack(side="left", fill="y")
 
         body = tk.Frame(self, background=theme.SURFACE)
-        body.pack(side="left", fill="both", expand=True, padx=(10, 12), pady=5)
+        body.pack(
+            side="left",
+            fill="both",
+            expand=True,
+            padx=(theme.px(10), theme.px(12)),
+            pady=theme.px(5),
+        )
         self._body = body
 
         self._title_label = tk.Label(
@@ -68,7 +83,7 @@ class DeckRow(tk.Frame):
             font=fonts["small"],
             anchor="w",
         )
-        self._meta_label.pack(fill="x", pady=(1, 0))
+        self._meta_label.pack(fill="x", pady=(theme.px(1), 0))
 
         bind_recursive(self, "<Enter>", self._on_enter)
         bind_recursive(self, "<Leave>", self._on_leave)
@@ -94,21 +109,39 @@ class DeckRow(tk.Frame):
         stamp = entry.meta.updated_at.replace("T", " ")[:16] if entry.meta.updated_at else "—"
         return f"{entry.card_count} 张  ·  {stamp}"
 
-    def _repaint(self) -> None:
+    def _target(self) -> tuple[str, str]:
+        """当前状态该有的 (背景色, 竖条色)。"""
         if self._selected:
-            background = theme.SELECTED
-            marker = theme.ACCENT
-        elif self._hover:
-            background = theme.HOVER
-            marker = theme.HOVER
-        else:
-            background = theme.SURFACE
-            marker = theme.SURFACE
+            return theme.SELECTED, theme.ACCENT
+        if self._hover:
+            return theme.HOVER, theme.HOVER
+        return theme.SURFACE, theme.SURFACE
 
+    def _repaint(self) -> None:
+        target, marker = self._target()
+        if target == self._background or anim.reduce_motion():
+            self._background = target
+            self._apply(target, marker)
+            return
+
+        start = self._background
+
+        def frame(t: float) -> None:
+            self._apply(anim.lerp_color(start, target, t), marker)
+
+        def done() -> None:
+            self._background = target
+            self._apply(target, marker)
+
+        anim.animate(self, 110, frame, on_done=done)
+
+    def _apply(self, background: str, marker: str) -> None:
         for widget in (self, self._body, self._title_label, self._meta_label):
             widget.configure(background=background)
         self._marker.configure(background=marker)
-        self._title_label.configure(foreground=theme.ACCENT_DARK if self._selected else theme.TEXT)
+        self._title_label.configure(
+            foreground=theme.ACCENT_DARK if self._selected else theme.TEXT
+        )
 
     # -- 事件 ------------------------------------------------------------
 
@@ -153,7 +186,9 @@ class DeckList(tk.Frame):
 
         # 顶部小标题：让「这是一列牌组」这件事明确，也顺便把高度撑开一点
         head = tk.Frame(self, background=theme.SURFACE)
-        head.pack(fill="x", padx=14, pady=(10, 6))
+        head.pack(
+            fill="x", padx=theme.px(14), pady=(theme.px(10), theme.px(6))
+        )
         tk.Label(
             head,
             text="牌组",
