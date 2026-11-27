@@ -1,10 +1,11 @@
-"""界面常量：字体、配色、间距。
+"""界面常量：配色、间距、字体。
 
 集中在一处是因为 Windows 上 Tk 的默认外观太老，用户第一眼就会觉得
-「这是十年前的程序」。改这几十个数字比在每个控件上写一遍可靠。
+「这是十年前的程序」。
 
-配色取的是偏中性的深色文字 + 一个蓝色主色，跟 iOS 版的观感靠拢，
-但不追求像素级一致——两个平台的控件本来就不一样，硬凑只会两头不像。
+配色是一套中性灰 + 单一蓝色主色。灰阶分得比一般 Tk 程序细，因为界面里
+层次一多（窗口底 / 面板 / 面板里的次级块 / 悬停 / 选中 / 边框），只有两三
+档灰就会糊成一片，看着「脏」。
 """
 
 from __future__ import annotations
@@ -13,33 +14,53 @@ import tkinter.font as tkfont
 from typing import Any
 
 # -- 颜色 ---------------------------------------------------------------
+# 灰阶由浅到深：BG 是窗口底，SURFACE 是面板，SURFACE_ALT 是面板里的次级块。
+BG = "#EEF1F6"
+SURFACE = "#FFFFFF"
+SURFACE_ALT = "#F6F7FA"
+HOVER = "#F1F3F8"
+SELECTED = "#E9F1FF"
 
-BG = "#F5F5F7"          # 窗口底色，比纯白柔和
-SURFACE = "#FFFFFF"     # 卡片、列表
-BORDER = "#D8D8DE"
-TEXT = "#1D1D1F"
-MUTED = "#6E6E73"
-ACCENT = "#0A84FF"
-ACCENT_DARK = "#0066CC"
-WARN = "#C77700"
+BORDER = "#E3E6ED"
+BORDER_STRONG = "#CFD4DE"
+
+TEXT = "#15171C"
+TEXT_SOFT = "#424857"
+MUTED = "#8B92A3"
+
+ACCENT = "#2F6BFF"
+ACCENT_DARK = "#1F55D8"
+ACCENT_SOFT = "#EAF0FF"
+
+WARN = "#B26A00"
+WARN_SOFT = "#FFF4E3"
 ERROR = "#C0392B"
-SUCCESS = "#1E7B34"
+ERROR_SOFT = "#FDECEA"
+SUCCESS = "#16794C"
+SUCCESS_SOFT = "#E7F6EE"
+
+#: 卡片底下那层「影子」。Tk 没有真阴影，用一层比底色深一点的边框模拟
+#: 一个像素的落差，比纯描边看着轻。
+SHADOW = "#E7EAF1"
 
 # -- 间距 ---------------------------------------------------------------
 
 PAD_XS = 4
 PAD_S = 8
 PAD_M = 12
-PAD_L = 20
-PAD_XL = 32
+PAD_L = 18
+PAD_XL = 28
 
-# -- 字体 ---------------------------------------------------------------
+# -- 字号 ---------------------------------------------------------------
 
-#: 界面用的字号。Windows 默认缩放 100% 时 9pt 偏小，10 比较舒服。
+H1_SIZE = 19
+H2_SIZE = 13
 BODY_SIZE = 10
 SMALL_SIZE = 9
-TITLE_SIZE = 16
-HEADING_SIZE = 12
+
+#: 列表行高、按钮高度。集中在这里是因为自绘控件要拿它算坐标。
+ROW_HEIGHT = 58
+BUTTON_HEIGHT = 34
 
 
 def load_fonts(root: Any) -> dict[str, tkfont.Font]:
@@ -58,76 +79,71 @@ def load_fonts(root: Any) -> dict[str, tkfont.Font]:
         family = tkfont.nametofont("TkDefaultFont").actual("family")
 
     return {
+        "h1": tkfont.Font(root=root, family=family, size=H1_SIZE, weight="bold"),
+        "h2": tkfont.Font(root=root, family=family, size=H2_SIZE, weight="bold"),
         "body": tkfont.Font(root=root, family=family, size=BODY_SIZE),
+        "body_bold": tkfont.Font(root=root, family=family, size=BODY_SIZE, weight="bold"),
         "small": tkfont.Font(root=root, family=family, size=SMALL_SIZE),
-        "title": tkfont.Font(root=root, family=family, size=TITLE_SIZE, weight="bold"),
-        "heading": tkfont.Font(root=root, family=family, size=HEADING_SIZE, weight="bold"),
         "mono": tkfont.Font(root=root, family="Consolas", size=SMALL_SIZE),
+        # 下面三个是为了兼容早先按 title/heading 取字体的调用点。
+        "title": tkfont.Font(root=root, family=family, size=H1_SIZE, weight="bold"),
+        "heading": tkfont.Font(root=root, family=family, size=H2_SIZE, weight="bold"),
     }
 
 
 def apply_theme(root: Any) -> dict[str, tkfont.Font]:
-    """把配色与字体套到 ttk 上，返回字体表供各视图复用。"""
+    """把配色与字体套到还要用的几个 ttk 控件上，返回字体表。
+
+    界面主体是自绘的 `tk` 控件（见 `widgets.py`），ttk 只剩滚动条、下拉框、
+    数字框、进度条这几样没有原生替代的。它们必须用 `clam` 主题——`vista`
+    主题会把背景色、边框色统统接管，改了也不生效。
+    """
     from tkinter import ttk
 
     fonts = load_fonts(root)
     style = ttk.Style(root)
-
-    # 'vista' 在 Windows 上可用，比默认的 'xpnative' 更接近现代观感。
-    # 万一跑在别的系统上（或老 Windows），别抛错，用默认主题继续。
-    if "vista" in style.theme_names():
-        style.theme_use("vista")
+    style.theme_use("clam")
 
     root.configure(background=BG)
 
-    style.configure("TFrame", background=BG)
-    style.configure("Surface.TFrame", background=SURFACE)
-
-    style.configure("TLabel", background=BG, foreground=TEXT, font=fonts["body"])
-    style.configure("Muted.TLabel", background=BG, foreground=MUTED, font=fonts["small"])
-    style.configure("Title.TLabel", background=BG, foreground=TEXT, font=fonts["title"])
-    style.configure("Heading.TLabel", background=BG, foreground=TEXT, font=fonts["heading"])
-    style.configure("Error.TLabel", background=BG, foreground=ERROR, font=fonts["body"])
-    style.configure("Warn.TLabel", background=BG, foreground=WARN, font=fonts["small"])
-    style.configure("Success.TLabel", background=BG, foreground=SUCCESS, font=fonts["body"])
-
-    style.configure("Surface.TLabel", background=SURFACE, foreground=TEXT, font=fonts["body"])
-    style.configure("SurfaceMuted.TLabel", background=SURFACE, foreground=MUTED, font=fonts["small"])
-
-    style.configure("TButton", font=fonts["body"], padding=(PAD_M, PAD_XS + 2))
-    style.configure("Accent.TButton", font=fonts["body"], padding=(PAD_M, PAD_XS + 2))
-
-    style.configure("TEntry", font=fonts["body"], padding=PAD_XS)
-    style.configure("TCombobox", font=fonts["body"])
-
-    style.configure(
-        "Treeview",
-        background=SURFACE,
-        fieldbackground=SURFACE,
-        foreground=TEXT,
-        font=fonts["body"],
-        rowheight=28,
-        borderwidth=0,
+    # 滚动条：细、无箭头、悬停加深。默认那条带上下箭头的老式滚动条是
+    # 整个界面里最「Windows 98」的一处。
+    style.layout(
+        "Vertical.TScrollbar",
+        [("Vertical.Scrollbar.trough", {"sticky": "ns", "children": [
+            ("Vertical.Scrollbar.thumb", {"expand": "1", "sticky": "nswe"})
+        ]})],
     )
     style.configure(
-        "Treeview.Heading",
-        font=fonts["small"],
-        background=BG,
-        foreground=MUTED,
+        "Vertical.TScrollbar",
+        gripcount=0,
+        background=BORDER_STRONG,
+        darkcolor=BORDER_STRONG,
+        lightcolor=BORDER_STRONG,
+        troughcolor=SURFACE,
+        bordercolor=SURFACE,
+        arrowcolor=SURFACE,
         relief="flat",
-        padding=(PAD_S, PAD_XS + 2),
+        width=9,
     )
-    style.map("Treeview", background=[("selected", ACCENT)], foreground=[("selected", "#FFFFFF")])
+    style.map(
+        "Vertical.TScrollbar",
+        background=[("active", MUTED), ("pressed", MUTED)],
+        darkcolor=[("active", MUTED)],
+        lightcolor=[("active", MUTED)],
+    )
 
-    style.configure("TLabelframe", background=BG, bordercolor=BORDER)
-    style.configure("TLabelframe.Label", background=BG, foreground=MUTED, font=fonts["small"])
-
+    style.configure("TCombobox", font=fonts["body"], padding=4)
+    style.configure("TSpinbox", font=fonts["body"], padding=4)
     style.configure(
         "Horizontal.TProgressbar",
         background=ACCENT,
-        troughcolor="#E4E4E9",
+        troughcolor=BG,
+        bordercolor=BG,
+        lightcolor=ACCENT,
+        darkcolor=ACCENT,
         borderwidth=0,
-        thickness=8,
+        thickness=6,
     )
 
     return fonts

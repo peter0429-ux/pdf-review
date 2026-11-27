@@ -15,9 +15,10 @@ from typing import Optional
 from core import ai, analyzer, limits
 from core import settings as settings_mod
 from core.extract import SUPPORTED_SUFFIXES, ExtractError, Extraction, extract
-from core.project import DeckMeta, DeckStore, default_workspace
+from core.project import DeckMeta, DeckStore
 
 from . import theme
+from .widgets import Divider, RoundedButton
 from .worker import Worker
 
 #: 文件对话框的过滤器。写在一处，将来加格式改这里。
@@ -33,6 +34,30 @@ _FILE_TYPES = [
 ]
 
 
+class _Section:
+    """带序号的小标题。三步流程用它分段，眼睛好找位置。"""
+
+    def __init__(self, parent: tk.Misc, fonts: dict[str, tkfont.Font], index: str, title: str) -> None:
+        row = tk.Frame(parent, background=theme.SURFACE)
+        row.pack(fill="x", pady=(0, theme.PAD_XS))
+
+        tk.Label(
+            row,
+            text=index,
+            font=fonts["small"],
+            foreground=theme.ACCENT,
+            background=theme.ACCENT_SOFT,
+            width=2,
+        ).pack(side="left", ipady=1)
+        tk.Label(
+            row,
+            text=title,
+            font=fonts["h2"],
+            foreground=theme.TEXT,
+            background=theme.SURFACE,
+        ).pack(side="left", padx=(theme.PAD_S, 0))
+
+
 class AnalyzeDialog(tk.Toplevel):
     """点「新建牌组」开的就是这个。成功建出牌组后 `created_folder` 不为空。"""
 
@@ -45,8 +70,8 @@ class AnalyzeDialog(tk.Toplevel):
     ) -> None:
         super().__init__(master)
         self.title("新建牌组")
-        self.configure(background=theme.BG)
-        self.minsize(560, 460)
+        self.configure(background=theme.SURFACE)
+        self.minsize(600, 440)
         self.transient(master)
 
         self.created_folder: Optional[Path] = None
@@ -73,57 +98,100 @@ class AnalyzeDialog(tk.Toplevel):
     # -- 构建 ------------------------------------------------------------
 
     def _build(self) -> None:
-        body = ttk.Frame(self, padding=theme.PAD_L)
+        body = tk.Frame(self, background=theme.SURFACE, padx=theme.PAD_XL, pady=theme.PAD_L)
         body.pack(fill="both", expand=True)
 
         # 1. 选文件
-        ttk.Label(body, text="① 选一份文件", style="Heading.TLabel").pack(anchor="w")
-        picker = ttk.Frame(body)
+        _Section(body, self._fonts, "1", "选一份文件")
+        picker = tk.Frame(body, background=theme.SURFACE)
         picker.pack(fill="x", pady=(theme.PAD_S, 0))
         ttk.Entry(picker, textvariable=self._path_text, state="readonly").pack(
-            side="left", fill="x", expand=True
+            side="left", fill="x", expand=True, ipady=4
         )
-        self._pick_button = ttk.Button(picker, text="选文件…", command=self._on_pick)
+        self._pick_button = RoundedButton(
+            picker, text="选文件…", variant="secondary", fonts=self._fonts, background=theme.SURFACE, command=self._on_pick
+        )
         self._pick_button.pack(side="left", padx=(theme.PAD_S, 0))
 
-        ttk.Label(
+        # 用「 / 」分隔并留空格：Tk 只在空格处断行，中文连排会被当成一个
+        # 超长单词整段挪到下一行，前面只剩「支持」两个字孤零零一行。
+        tk.Label(
             body,
-            text="支持 PDF、Word（.docx）、PowerPoint（.pptx）、Excel（.xlsx）、纯文本、Markdown、网页。"
-            "扫描件（只有图片没有文字层的 PDF）读不出来。",
-            style="Muted.TLabel",
-            wraplength=560,
+            text="支持 PDF / Word（.docx）/ PowerPoint（.pptx）/ Excel（.xlsx）/ 纯文本 / Markdown / 网页",
+            font=self._fonts["small"],
+            foreground=theme.MUTED,
+            background=theme.SURFACE,
+            anchor="w",
             justify="left",
-        ).pack(anchor="w", pady=(theme.PAD_XS, 0))
+            wraplength=520,
+        ).pack(fill="x", pady=(theme.PAD_XS, 0))
+        tk.Label(
+            body,
+            text="扫描件（只有图片、没有文字层的 PDF）读不出来。",
+            font=self._fonts["small"],
+            foreground=theme.MUTED,
+            background=theme.SURFACE,
+            anchor="w",
+            justify="left",
+            wraplength=520,
+        ).pack(fill="x")
 
         # 2. 牌组名
-        ttk.Label(body, text="② 起个名字", style="Heading.TLabel").pack(anchor="w", pady=(theme.PAD_M, 0))
-        ttk.Entry(body, textvariable=self._title).pack(fill="x", pady=(theme.PAD_S, 0))
-        ttk.Label(
+        tk.Frame(body, background=theme.SURFACE, height=theme.PAD_M).pack(fill="x")
+        _Section(body, self._fonts, "2", "起个名字")
+        ttk.Entry(body, textvariable=self._title, font=self._fonts["body"]).pack(
+            fill="x", pady=(theme.PAD_S, 0), ipady=4
+        )
+        tk.Label(
             body,
             text=f"留空就用文件名。最多 {limits.TITLE_MAX} 个字。",
-            style="Muted.TLabel",
-        ).pack(anchor="w", pady=(2, 0))
+            font=self._fonts["small"],
+            foreground=theme.MUTED,
+            background=theme.SURFACE,
+            anchor="w",
+        ).pack(fill="x", pady=(4, 0))
 
         # 3. 进度
-        ttk.Label(body, text="③ 开始分析", style="Heading.TLabel").pack(anchor="w", pady=(theme.PAD_M, 0))
+        tk.Frame(body, background=theme.SURFACE, height=theme.PAD_M).pack(fill="x")
+        _Section(body, self._fonts, "3", "开始分析")
 
         self._progress = ttk.Progressbar(
             body, orient="horizontal", mode="determinate", maximum=1.0, variable=self._progress_value
         )
         self._progress.pack(fill="x", pady=(theme.PAD_S, theme.PAD_XS))
 
-        ttk.Label(body, textvariable=self._progress_text, style="Muted.TLabel").pack(anchor="w")
-        ttk.Label(body, textvariable=self._hint, style="Muted.TLabel", wraplength=560, justify="left").pack(
-            anchor="w", pady=(2, 0)
-        )
+        tk.Label(
+            body,
+            textvariable=self._progress_text,
+            font=self._fonts["small"],
+            foreground=theme.TEXT_SOFT,
+            background=theme.SURFACE,
+            anchor="w",
+        ).pack(fill="x")
+        tk.Label(
+            body,
+            textvariable=self._hint,
+            font=self._fonts["small"],
+            foreground=theme.MUTED,
+            background=theme.SURFACE,
+            anchor="w",
+            justify="left",
+            wraplength=520,
+        ).pack(fill="x", pady=(4, 0))
+
+        Divider(self).pack(fill="x")
 
         # 底部按钮
-        footer = ttk.Frame(body)
-        footer.pack(fill="x", side="bottom", pady=(theme.PAD_L, 0))
+        footer = tk.Frame(self, background=theme.SURFACE, padx=theme.PAD_XL, pady=theme.PAD_M)
+        footer.pack(fill="x", side="bottom")
 
-        self._start_button = ttk.Button(footer, text="开始分析", command=self._on_start)
+        self._start_button = RoundedButton(
+            footer, text="开始分析", variant="primary", fonts=self._fonts, background=theme.SURFACE, command=self._on_start
+        )
         self._start_button.pack(side="right")
-        self._cancel_button = ttk.Button(footer, text="取消", command=self._on_cancel)
+        self._cancel_button = RoundedButton(
+            footer, text="取消", variant="ghost", fonts=self._fonts, background=theme.SURFACE, command=self._on_cancel
+        )
         self._cancel_button.pack(side="right", padx=(0, theme.PAD_S))
 
     def _center_on(self, master: tk.Misc) -> None:
@@ -154,7 +222,7 @@ class AnalyzeDialog(tk.Toplevel):
         # 先抽一遍看看能不能读：这一步很快（大文件几秒），
         # 也比让用户点了「开始分析」等半天才发现是扫描件强。
         self._hint.set("正在读取文件…")
-        self._start_button.configure(state="disabled")
+        self._start_button.set_enabled(False)
         self.update_idletasks()
 
         try:
@@ -162,16 +230,16 @@ class AnalyzeDialog(tk.Toplevel):
         except ExtractError as exc:
             self._extraction = None
             self._hint.set(str(exc))
-            self._start_button.configure(state="normal")
+            self._start_button.set_enabled(True)
             return
         except Exception as exc:  # noqa: BLE001
             self._extraction = None
             self._hint.set(f"读取失败：{exc}")
-            self._start_button.configure(state="normal")
+            self._start_button.set_enabled(True)
             return
 
         self._extraction = extraction
-        self._start_button.configure(state="normal")
+        self._start_button.set_enabled(True)
 
         if not extraction.has_text_layer:
             self._hint.set(
@@ -208,9 +276,9 @@ class AnalyzeDialog(tk.Toplevel):
         config = ai.AIConfig.from_settings(self._settings)
         per_chunk = self._settings.cards_per_chunk
 
-        self._start_button.configure(state="disabled")
-        self._pick_button.configure(state="disabled")
-        self._cancel_button.configure(text="停止")
+        self._start_button.set_enabled(False)
+        self._pick_button.set_enabled(False)
+        self._cancel_button.set_text("停止")
         self._progress_value.set(0.0)
         self._progress_text.set("准备中…")
         self._hint.set("")
@@ -282,9 +350,9 @@ class AnalyzeDialog(tk.Toplevel):
         self._hint.set(f"失败：{error}")
 
     def _reset_buttons(self) -> None:
-        self._start_button.configure(state="normal")
-        self._pick_button.configure(state="normal")
-        self._cancel_button.configure(text="取消")
+        self._start_button.set_enabled(True)
+        self._pick_button.set_enabled(True)
+        self._cancel_button.set_text("取消")
 
     # -- 关窗 ------------------------------------------------------------
 

@@ -14,6 +14,51 @@ from typing import Optional
 from core import ai, settings as settings_mod
 
 from . import theme
+from .widgets import Divider, RoundedButton
+
+
+class _Field:
+    """一行输入：标签 + 输入框 + 灰色说明。
+
+    单独抽出来是因为三段几乎一样、只有标签和提示不同；写在 `_build()`
+    里会变成三层嵌套循环，改个间距要数行号。
+    """
+
+    def __init__(
+        self,
+        parent: tk.Misc,
+        fonts: dict[str, tkfont.Font],
+        label: str,
+        variable: tk.StringVar,
+        hint: str,
+        secret: bool = False,
+    ) -> None:
+        self.frame = tk.Frame(parent, background=theme.SURFACE)
+        self.frame.pack(fill="x", pady=(0, theme.PAD_M))
+
+        tk.Label(
+            self.frame,
+            text=label,
+            font=fonts["small"],
+            foreground=theme.TEXT_SOFT,
+            background=theme.SURFACE,
+            anchor="w",
+        ).pack(fill="x", pady=(0, 4))
+
+        self.entry = ttk.Entry(self.frame, textvariable=variable, font=fonts["body"])
+        self.entry.pack(fill="x", ipady=6)
+        if secret:
+            self.entry.configure(show="•")
+
+        tk.Label(
+            self.frame,
+            text=hint,
+            font=fonts["small"],
+            foreground=theme.MUTED,
+            background=theme.SURFACE,
+            anchor="w",
+            justify="left",
+        ).pack(fill="x", pady=(4, 0))
 
 
 class SettingsDialog(tk.Toplevel):
@@ -22,7 +67,7 @@ class SettingsDialog(tk.Toplevel):
     def __init__(self, master: tk.Misc, fonts: dict[str, tkfont.Font], current: settings_mod.Settings) -> None:
         super().__init__(master)
         self.title("设置")
-        self.configure(background=theme.BG)
+        self.configure(background=theme.SURFACE)
         self.resizable(False, False)
         self.transient(master)
         self.grab_set()
@@ -54,61 +99,113 @@ class SettingsDialog(tk.Toplevel):
     # -- 构建 ------------------------------------------------------------
 
     def _build(self) -> None:
-        body = ttk.Frame(self, padding=theme.PAD_L)
+        body = tk.Frame(self, background=theme.SURFACE, padx=theme.PAD_XL, pady=theme.PAD_L)
         body.pack(fill="both", expand=True)
 
-        ttk.Label(body, text="AI 接口", style="Heading.TLabel").grid(
-            row=0, column=0, columnspan=2, sticky="w", pady=(0, theme.PAD_M)
-        )
-
-        rows = [
-            ("接口地址", self._base_url, "填到 /v1 为止，不要带 /chat/completions", "base"),
-            ("模型名", self._model, "例如 gpt-4o-mini、deepseek-chat", "model"),
-            ("API Key", self._api_key, "只保存在这台电脑上，用 Windows 账户加密", "key"),
-        ]
-
-        self._entries_by_name: dict[str, ttk.Entry] = {}
-
-        for offset, (label, variable, hint, name) in enumerate(rows, start=1):
-            ttk.Label(body, text=label).grid(row=offset * 2 - 1, column=0, sticky="e", padx=(0, theme.PAD_S), pady=(theme.PAD_S, 0))
-            entry = ttk.Entry(body, textvariable=variable, width=46, font=self._fonts["body"])
-            entry.grid(row=offset * 2 - 1, column=1, sticky="we", pady=(theme.PAD_S, 0))
-            if name == "key":
-                entry.configure(show="•")
-            self._entries_by_name[name] = entry
-            ttk.Label(body, text=hint, style="Muted.TLabel").grid(
-                row=offset * 2, column=1, sticky="w", pady=(2, 0)
-            )
-
-        # 每块卡片数
-        row = len(rows) * 2 + 1
-        ttk.Label(body, text="每块卡片数").grid(row=row, column=0, sticky="e", padx=(0, theme.PAD_S), pady=(theme.PAD_M, 0))
-        spin = ttk.Spinbox(body, from_=1, to=12, textvariable=self._cards, width=6)
-        spin.grid(row=row, column=1, sticky="w", pady=(theme.PAD_M, 0))
-        ttk.Label(
+        tk.Label(
             body,
-            text="每份文件会被切成若干块，一块问一次模型。6 是个稳妥的默认值。",
-            style="Muted.TLabel",
-            wraplength=380,
+            text="AI 接口",
+            font=self._fonts["h2"],
+            foreground=theme.TEXT,
+            background=theme.SURFACE,
+            anchor="w",
+        ).pack(fill="x")
+        tk.Label(
+            body,
+            text="填的是 OpenAI 兼容接口。DeepSeek、通义、本地 Ollama 都按这个格式填。",
+            font=self._fonts["small"],
+            foreground=theme.MUTED,
+            background=theme.SURFACE,
+            anchor="w",
+        ).pack(fill="x", pady=(4, theme.PAD_L))
+
+        self._base_field = _Field(
+            body,
+            self._fonts,
+            "接口地址",
+            self._base_url,
+            "填到 /v1 为止，不要带 /chat/completions",
+        )
+        self._model_field = _Field(
+            body,
+            self._fonts,
+            "模型名",
+            self._model,
+            "例如 gpt-4o-mini、deepseek-chat",
+        )
+        self._key_field = _Field(
+            body,
+            self._fonts,
+            "API Key",
+            self._api_key,
+            "只保存在这台电脑上，用 Windows 账户加密",
+            secret=True,
+        )
+        self._entries_by_name: dict[str, ttk.Entry] = {
+            "base": self._base_field.entry,
+            "model": self._model_field.entry,
+            "key": self._key_field.entry,
+        }
+
+        divider = Divider(body)
+        divider.pack(fill="x", pady=(theme.PAD_XS, theme.PAD_M))
+
+        cards_row = tk.Frame(body, background=theme.SURFACE)
+        cards_row.pack(fill="x")
+        tk.Label(
+            cards_row,
+            text="每块卡片数",
+            font=self._fonts["small"],
+            foreground=theme.TEXT_SOFT,
+            background=theme.SURFACE,
+        ).pack(side="left")
+        spin = ttk.Spinbox(cards_row, from_=1, to=12, textvariable=self._cards, width=5)
+        spin.pack(side="left", padx=(theme.PAD_S, theme.PAD_S))
+        tk.Label(
+            cards_row,
+            text="6 是个稳妥的默认值",
+            font=self._fonts["small"],
+            foreground=theme.MUTED,
+            background=theme.SURFACE,
+        ).pack(side="left")
+
+        tk.Label(
+            body,
+            text="每份文件会被切成若干块，一块问一次模型。块越大越省调用，但一次要出的卡越多，题目质量会往下掉。",
+            font=self._fonts["small"],
+            foreground=theme.MUTED,
+            background=theme.SURFACE,
+            anchor="w",
             justify="left",
-        ).grid(row=row + 1, column=1, sticky="w", pady=(2, 0))
+            wraplength=420,
+        ).pack(fill="x", pady=(4, 0))
 
-        # 测试按钮 + 状态
-        actions = ttk.Frame(body)
-        actions.grid(row=row + 2, column=0, columnspan=2, sticky="we", pady=(theme.PAD_L, 0))
+        self._test_button = RoundedButton(
+            body, text="测试连接", variant="secondary", fonts=self._fonts, background=theme.SURFACE, command=self._on_test
+        )
+        self._test_button.pack(anchor="w", pady=(theme.PAD_L, 0))
 
-        self._test_button = ttk.Button(actions, text="测试连接", command=self._on_test)
-        self._test_button.pack(side="left")
+        tk.Label(
+            body,
+            textvariable=self._status,
+            font=self._fonts["small"],
+            foreground=theme.MUTED,
+            background=theme.SURFACE,
+            anchor="w",
+            justify="left",
+            wraplength=440,
+        ).pack(fill="x", pady=(theme.PAD_S, 0))
 
-        ttk.Label(
-            body, textvariable=self._status, style="Muted.TLabel", wraplength=460, justify="left"
-        ).grid(row=row + 3, column=0, columnspan=2, sticky="w", pady=(theme.PAD_S, 0))
+        Divider(self).pack(fill="x")
 
-        # 底部按钮
-        footer = ttk.Frame(self, padding=(theme.PAD_L, 0, theme.PAD_L, theme.PAD_L))
+        footer = tk.Frame(self, background=theme.SURFACE, padx=theme.PAD_XL, pady=theme.PAD_M)
         footer.pack(fill="x")
-        ttk.Button(footer, text="取消", command=self._on_cancel).pack(side="right")
-        ttk.Button(footer, text="保存", command=self._on_save).pack(side="right", padx=(0, theme.PAD_S))
+        RoundedButton(footer, text="保存", variant="primary", fonts=self._fonts, background=theme.SURFACE, command=self._on_save).pack(
+            side="right"
+        )
+        RoundedButton(footer, text="取消", variant="ghost", fonts=self._fonts, background=theme.SURFACE, command=self._on_cancel).pack(
+            side="right", padx=(0, theme.PAD_S)
+        )
 
     def _focus(self, name: str) -> None:
         """把光标放到某一格。窗口可能已经被关掉了，所以要防一手。"""
@@ -145,7 +242,7 @@ class SettingsDialog(tk.Toplevel):
             return
 
         self._status.set("正在连接…")
-        self._test_button.configure(state="disabled")
+        self._test_button.set_enabled(False)
         self.update_idletasks()
 
         # 连网在主线程里做会卡住窗口；这里用一个小线程，测完用 after 回主线程。
@@ -164,7 +261,9 @@ class SettingsDialog(tk.Toplevel):
         threading.Thread(target=run, daemon=True).start()
 
     def _finish_test(self, reply: Optional[str], error: Optional[str]) -> None:
-        self._test_button.configure(state="normal")
+        if not self.winfo_exists():
+            return
+        self._test_button.set_enabled(True)
         if error:
             self._status.set(f"连接失败：{error}")
         else:
