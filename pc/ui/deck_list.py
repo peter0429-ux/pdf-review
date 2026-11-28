@@ -20,6 +20,9 @@ from core.project import DeckEntry
 from . import anim, theme
 from .widgets import ScrollArea, bind_recursive
 
+#: 相邻两行淡入的间隔。全列一起冒出来会显得很吵。
+_ROW_STAGGER_MS = 26
+
 
 class DeckRow(tk.Frame):
     """一行：选中竖条 + 标题 + 「N 张 · 时间」。"""
@@ -101,6 +104,35 @@ class DeckRow(tk.Frame):
             return
         self._selected = selected
         self._repaint()
+
+    def fade_in(self, delay_ms: int) -> None:
+        """从「比底色略深」过渡到当前该有的颜色。
+
+        用背景色模拟淡入：Tk 的 Frame 不支持 alpha，而在这么小的一块上
+        贴一层半透明遮罩又太贵。浅灰到本色之间过一下，观感上就是「落下」。
+        """
+        if anim.reduce_motion():
+            return
+        target, marker = self._target()
+        start = theme.BORDER
+
+        def begin() -> None:
+            if not self.winfo_exists():
+                return
+
+            def frame(t: float) -> None:
+                self._apply(anim.lerp_color(start, target, t), marker)
+
+            def done() -> None:
+                # 别忘了同步 `_background`：之后的悬停/选中动画是从它
+                # 出发插值的，不同步的话下一次过渡会从旧的灰色跳一下。
+                self._background = target
+                self._apply(target, marker)
+
+            self._apply(start, marker)
+            anim.animate(self, 180, frame, on_done=done)
+
+        self.after(delay_ms, begin)
 
     # -- 内部 ------------------------------------------------------------
 
@@ -230,6 +262,8 @@ class DeckList(tk.Frame):
             row.pack(fill="x")
             self._rows[key] = row
 
+        self._fade_in_rows()
+
         target: Optional[str] = None
         if keep is not None and str(keep) in self._rows:
             target = str(keep)
@@ -268,6 +302,20 @@ class DeckList(tk.Frame):
         return len(self._entries)
 
     # -- 事件 ------------------------------------------------------------
+
+    def _fade_in_rows(self) -> None:
+        """新建出来的行从浅到实「落」下来。
+
+        列表是整块重建的（`set_entries`），重建后所有行同时出现会像刷了
+        一下屏。让它们按顺序淡入，眼睛能跟上是「换了内容」而不是「闪了」。
+
+        这里淡的不是透明度（Tk 的 Frame 没有 alpha），而是背景色：
+        从比底色略深一点的灰过渡到本来的颜色。
+        """
+        if anim.reduce_motion():
+            return
+        for order, row in enumerate(self._rows.values()):
+            row.fade_in(order * _ROW_STAGGER_MS)
 
     def _click(self, key: str) -> None:
         self.select(key)

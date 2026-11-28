@@ -16,7 +16,7 @@ from typing import Optional
 from core.cards import AnalysisDocument, Card
 
 from . import anim, theme
-from .widgets import Chip, IndexBadge, ScrollArea
+from .widgets import Chip, IndexBadge, ScrollArea, bind_recursive
 
 #: 卡片入场动画的位移量（设计像素）。太大像在「弹」，太小看不出来。
 _ENTER_OFFSET = 18
@@ -131,21 +131,68 @@ class CardPreview(tk.Frame):
             self.after(delay, lambda s=spacer: self._animate_spacer(s))
 
     def _animate_spacer(self, spacer: tk.Frame) -> None:
+        """占位块从满高压到 0，卡片因此从下方滑上来。
+
+        用 `ease_out_back`：收尾会轻微冲过头再回弹，看起来像「落定」，
+        比匀速滑上来有质感。回弹量靠 `_ENTER_OFFSET` 很小，不会真的弹出界。
+        """
         if not spacer.winfo_exists():
             return
         full = theme.px(_ENTER_OFFSET)
 
         def frame(t: float) -> None:
-            remaining = int(round(full * (1.0 - anim.ease_out_cubic(t))))
-            self._set_spacer(spacer, remaining)
+            eased = anim.ease_out_back(t)
+            remaining = int(round(full * (1.0 - eased)))
+            self._set_spacer(spacer, max(0, remaining))
 
-        anim.animate(spacer, 220, frame, on_done=lambda: self._set_spacer(spacer, 0))
+        anim.animate(spacer, 260, frame, on_done=lambda: self._set_spacer(spacer, 0))
 
     @staticmethod
     def _set_spacer(spacer: tk.Frame, height: int) -> None:
         if not spacer.winfo_exists():
             return
         spacer.configure(height=max(0, height))
+
+    def _bind_card_hover(self, box: tk.Frame) -> None:
+        """鼠标移到卡片上时边框由淡灰渐变成浅蓝。
+
+        预览是只读的，这个高亮不是「可以点」的暗示，只是让人看清自己在
+        读哪一张——卡片多的时候眼睛容易串行。
+
+        必须绑到所有子控件（`bind_recursive`）：Tk 把事件先给最深的控件，
+        只绑外层的话鼠标压在文字上就收不到 Enter/Leave，高亮会一闪一闪。
+        """
+        state = {"hover": False}
+
+        def animate_to(target: str) -> None:
+            start = box.cget("highlightbackground")
+            if start == target:
+                return
+            if anim.reduce_motion():
+                box.configure(highlightbackground=target)
+                return
+
+            def frame(t: float) -> None:
+                if not box.winfo_exists():
+                    return
+                box.configure(highlightbackground=anim.lerp_color(start, target, t))
+
+            anim.animate(box, 130, frame, on_done=lambda: box.configure(highlightbackground=target))
+
+        def on_enter(_event: tk.Event) -> None:
+            if state["hover"]:
+                return
+            state["hover"] = True
+            animate_to(theme.ACCENT)
+
+        def on_leave(_event: tk.Event) -> None:
+            if not state["hover"]:
+                return
+            state["hover"] = False
+            animate_to(theme.BORDER)
+
+        bind_recursive(box, "<Enter>", on_enter)
+        bind_recursive(box, "<Leave>", on_leave)
 
     # -- 内部 ------------------------------------------------------------
 
@@ -184,6 +231,11 @@ class CardPreview(tk.Frame):
             highlightthickness=max(1, theme.px(1)),
         )
         box.pack(fill="x")
+
+        # 鼠标移到卡片上时边框由淡灰渐变成浅蓝。预览是只读的，这个高亮
+        # 不是「可以点」的暗示，只是让人看清自己在读哪一张——卡片多的时候
+        # 眼睛容易串行。
+        self._bind_card_hover(box)
 
         top = tk.Frame(box, background=card_bg)
         top.pack(fill="x", padx=theme.px(14), pady=(theme.px(12), 0))

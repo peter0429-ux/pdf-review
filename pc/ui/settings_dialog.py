@@ -313,8 +313,20 @@ class SettingsDialog(tk.Toplevel):
             messagebox.showerror("保存失败", str(exc), parent=self)
             return
         self.saved = True
-        self.destroy()
+        self._close_with_fade()
 
     def _on_cancel(self) -> None:
         self.saved = False
-        self.destroy()
+        self._close_with_fade()
+
+    def _close_with_fade(self) -> None:
+        """淡出后再销毁。
+
+        先把 grab 放掉：淡出期间窗口还在，抓着 grab 会让底下主窗口的
+        点击全被吃掉一百多毫秒，感觉像程序卡了一下。
+        """
+        try:
+            self.grab_release()
+        except Exception:  # noqa: BLE001 - 没 grab 过时会抛
+            pass
+        anim.fade_out_window(self, self.destroy)

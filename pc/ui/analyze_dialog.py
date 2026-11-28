@@ -20,7 +20,7 @@ from core.extract import SUPPORTED_SUFFIXES, ExtractError, Extraction, extract
 from core.project import DeckMeta, DeckStore
 
 from . import anim, theme
-from .widgets import Divider, RoundedButton
+from .widgets import Divider, RoundedButton, Spinner
 from .worker import Worker
 
 #: 文件对话框的过滤器。写在一处，将来加格式改这里。
@@ -183,14 +183,27 @@ class AnalyzeDialog(tk.Toplevel):
         )
         self._progress.pack(fill="x", pady=(theme.px(theme.PAD_S), theme.px(theme.PAD_XS)))
 
+        # 进度条第一格还没走完的那段时间（请求模型、等首个 token）看起来像
+        # 卡住了。转圈的小弧专门填这段空窗，让人知道程序在等网络而不是死了。
+        status_row = tk.Frame(body, background=theme.SURFACE)
+        status_row.pack(fill="x")
+
+        self._spinner = Spinner(
+            status_row,
+            size=theme.px(13),
+            thickness=1,
+            background=theme.SURFACE,
+        )
+        self._spinner.pack(side="left", padx=(0, theme.px(6)))
+
         tk.Label(
-            body,
+            status_row,
             textvariable=self._progress_text,
             font=self._fonts["small"],
             foreground=theme.TEXT_SOFT,
             background=theme.SURFACE,
             anchor="w",
-        ).pack(fill="x")
+        ).pack(side="left", fill="x", expand=True)
         tk.Label(
             body,
             textvariable=self._hint,
@@ -321,6 +334,7 @@ class AnalyzeDialog(tk.Toplevel):
         self._progress_value.set(0.0)
         self._progress_text.set("准备中…")
         self._hint.set("")
+        self._spinner.start()
 
         def job(report):
             return analyzer.analyze_file(
@@ -375,6 +389,7 @@ class AnalyzeDialog(tk.Toplevel):
         anim.tween_number(self, start, target, 400, frame)
 
     def _on_done(self, outcome: analyzer.AnalysisOutcome) -> None:
+        self._spinner.stop()
         document = outcome.document
         meta = DeckMeta(
             title=document.deck.title,
@@ -400,9 +415,10 @@ class AnalyzeDialog(tk.Toplevel):
             f"「{document.deck.title}」已存好，共 {len(document.cards)} 张卡片{suffix}。",
             parent=self,
         )
-        self.destroy()
+        self._close_with_fade()
 
     def _on_error(self, error: BaseException) -> None:
+        self._spinner.stop()
         self._reset_buttons()
         self._progress_text.set("")
         self._hint.set(f"失败：{error}")
@@ -412,6 +428,15 @@ class AnalyzeDialog(tk.Toplevel):
         self._pick_button.set_enabled(True)
         self._cancel_button.set_text("取消")
 
+    def _close_with_fade(self) -> None:
+        """淡出后再销毁。先放 grab，否则淡出期间主窗口点不动。"""
+        try:
+            self.grab_release()
+        except Exception:  # noqa: BLE001 - 没 grab 过时会抛
+            pass
+        self._spinner.stop()
+        anim.fade_out_window(self, self.destroy)
+
     # -- 关窗 ------------------------------------------------------------
 
     def _on_cancel(self) -> None:
@@ -419,7 +444,7 @@ class AnalyzeDialog(tk.Toplevel):
             self._worker.cancel()
             self._progress_text.set("正在停止…")
             return
-        self.destroy()
+        self._close_with_fade()
 
     def _on_close(self) -> None:
         if self._worker.running:
@@ -430,4 +455,4 @@ class AnalyzeDialog(tk.Toplevel):
             ):
                 return
             self._worker.cancel()
-        self.destroy()
+        self._close_with_fade()

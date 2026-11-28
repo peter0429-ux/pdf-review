@@ -17,6 +17,10 @@ API Key 落盘前用 Windows 的 DPAPI 加密，**不写明文**。
 
 设置在 `%APPDATA%\\PdfReviewPC\\settings.json`。文件里除 API Key 外都是明文，
 因为那些不是秘密（接口地址、模型名用户自己也会想看一眼）。
+
+**便携模式**：如果 exe 旁边有一个 `portable.txt`，或者环境变量
+`PDFREVIEW_HOME` 指向某个目录，设置与牌组都放在那里。这样整个文件夹可以
+拷到 U 盘或另一台电脑上直接用，不用去 `%APPDATA%` 里翻。
 """
 
 from __future__ import annotations
@@ -26,25 +30,59 @@ import ctypes
 import ctypes.wintypes
 import json
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 APP_DIR_NAME = "PdfReviewPC"
 SETTINGS_FILE_NAME = "settings.json"
+PORTABLE_MARKER = "portable.txt"
+HOME_ENV = "PDFREVIEW_HOME"
 
 #: DPAPI 加密后的密文前缀，用来区分「已加密」与「旧版本留下的明文」。
 #: 看见没有这个前缀的值，就当成明文读一次、下次保存时自动升级成密文。
 ENCRYPTED_PREFIX = "dpapi:"
 
 
+def app_root() -> Path:
+    """程序所在目录。
+
+    PyInstaller 打包后 `sys.executable` 是 exe 本身；从源码跑时是
+    python 解释器，那种情况下用 `main.py` 的目录才对。两种都覆盖。
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent
+
+
+def portable_dir() -> Optional[Path]:
+    """便携模式的根目录，没有就返回 None。
+
+    优先级：环境变量 > exe 旁边的 `portable.txt`。
+    环境变量优先是为了让测试能指向临时目录，不用往程序目录里放文件。
+    """
+    override = os.environ.get(HOME_ENV)
+    if override:
+        return Path(override)
+    root = app_root()
+    if (root / PORTABLE_MARKER).exists():
+        return root
+    return None
+
+
 def app_data_dir() -> Path:
-    """`%APPDATA%\\PdfReviewPC`。
+    """设置文件所在目录。
+
+    便携模式用程序目录；否则 `%APPDATA%\\PdfReviewPC`。
 
     这里**只算路径，不创建目录**。创建放在真要写文件的时候：读设置时目录
     不存在本来就应该拿到默认值，不该因为「建不了目录」把程序拦在启动画面
     之外。真写不进去时由 `save_settings` 报一句人话。
     """
+    portable = portable_dir()
+    if portable is not None:
+        return portable
     base = os.environ.get("APPDATA")
     if not base:
         # 理论上 Windows 上一定有 APPDATA；真没有就退到用户主目录，

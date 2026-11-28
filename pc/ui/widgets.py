@@ -71,6 +71,9 @@ class ScrollArea(tk.Frame):
     滚轮用 `bind_all` 注册，但每个实例都先判断指针是不是真在自己身上。
     不这么做的话，左边列表和右边预览会一起滚——用户滚的是列表，预览
     却在背后动，很难受。
+
+    滚动本身是带缓动的：滚一格不是瞬间跳过去，而是在 ~140ms 内滑过去。
+    鼠标滚轮一次通常连发好几格，直接跳会有「咔咔」的段落感。
     """
 
     def __init__(self, master: tk.Misc, background: str = theme.SURFACE) -> None:
@@ -105,13 +108,19 @@ class ScrollArea(tk.Frame):
         #: 是否正在显示滚动条。内容装得下时藏起来——clam 主题的滚动条在
         #: 不需要滚动时滑块会占满整条槽，变成一道常驻的灰色竖杠，很难看。
         self._bar_visible = True
+        #: 缓动滚动的目标位置（0..1 的分数）。None 表示没有正在进行的滚动。
+        self._scroll_target: Optional[float] = None
 
     # -- 对外 ------------------------------------------------------------
 
     def scroll_to_top(self) -> None:
+        self._scroll_target = None
+        anim.stop(self.canvas)
         self.canvas.yview_moveto(0)
 
     def clear(self) -> None:
+        anim.stop(self.canvas)
+        self._scroll_target = None
         for child in self.inner.winfo_children():
             child.destroy()
 
@@ -149,10 +158,41 @@ class ScrollArea(tk.Frame):
 
         if not event.delta:
             return
-        # Windows 一格是 120；高精度触控板会给更小的值，这里最多滚 3 行，
-        # 否则轻轻一划就飞到底。
+        # Windows 一格是 120；高精度触控板会给更小的值。
         steps = int(-event.delta / 120) or (-1 if event.delta > 0 else 1)
-        self.canvas.yview_scroll(max(-3, min(3, steps)), "units")
+        steps = max(-3, min(3, steps))
+        self._smooth_scroll(steps)
+
+    def _smooth_scroll(self, steps: int) -> None:
+        """滚 `steps` 行，带缓动。连续滚动时接着上一个目标继续加。"""
+        if anim.reduce_motion():
+            self.canvas.yview_scroll(steps, "units")
+            return
+
+        first, last = self.canvas.yview()
+        span = max(1e-6, last - first)
+        # 一「行」按 40 设计像素估。Tk 的 scroll unit 跟画布高度绑定，
+        # 不直观，所以直接用「内容高度的百分比」算。
+        content_height = max(1.0, float(self.inner.winfo_height()))
+        delta = steps * (theme.px(40) / content_height)
+
+        start = self._scroll_target if self._scroll_target is not None else first
+        target = max(0.0, min(1.0 - span, start + delta))
+        self._scroll_target = target
+
+        # 从「当前实际位置」出发插值到目标。起点在动画开始时取一次，
+        # 不在每帧里读——每帧读会让速度随帧序变化，看起来忽快忽慢。
+        origin = first
+
+        def frame(t: float) -> None:
+            eased = anim.ease_out_cubic(t)
+            self.canvas.yview_moveto(anim.lerp(origin, target, eased))
+
+        def done() -> None:
+            self.canvas.yview_moveto(target)
+            self._scroll_target = None
+
+        anim.animate(self.canvas, 140, frame, on_done=done)
 
 
 class RoundedButton(tk.Canvas):
@@ -163,6 +203,9 @@ class RoundedButton(tk.Canvas):
 
     悬停与按下时填充色是渐变过去的，不是瞬间跳变——瞬间跳变会让人觉得
     界面在「闪」而不是「响应」。
+
+    按下时整个按钮的内容往下沉 1px（`_press_offset`），松开弹回。这一点
+    位移很小，但没有它，点击就完全没有触感。
     """
 
     _PADDING_X = 14
@@ -186,6 +229,8 @@ class RoundedButton(tk.Canvas):
         self._hover = False
         self._pressed = False
         self._background = background
+        #: 按下时的下沉量（像素）。按下 1px、松开 0。
+        self._press_offset = 0.0
 
         pad = theme.px(self._PADDING_X)
         self._height = height if height is not None else theme.px(theme.BUTTON_HEIGHT)
@@ -272,13 +317,12 @@ class RoundedButton(tk.Canvas):
             return
 
         start = self._fill
-        filled = {"done": False}
 
         def frame(t: float) -> None:
             self._fill = anim.lerp_color(start, target, t)
+            self._draw()
 
         def finish() -> None:
-            filled["done"] = True
             self._fill = target
             self._draw()
 
@@ -295,12 +339,13 @@ class RoundedButton(tk.Canvas):
 
         _, outline, text_color, _ = self._palette()
         fill = self._fill
+        offset = self._press_offset
         round_rect(
             self,
             1,
-            1,
+            1 + offset,
             width - 1,
-            height - 1,
+            height - 1 + offset,
             theme.px(7),
             fill=fill,
             outline=outline,
@@ -308,11 +353,26 @@ class RoundedButton(tk.Canvas):
         )
         self.create_text(
             width / 2,
-            height / 2 + 1,
+            height / 2 + 1 + offset,
             text=self._text,
             fill=text_color,
             font=self._font,
         )
+
+    def _animate_press(self, down: bool) -> None:
+        """按下/松开时把内容下沉一点点。"""
+        target = 1.0 if down else 0.0
+        if anim.reduce_motion():
+            self._press_offset = target
+            self._draw()
+            return
+        start = self._press_offset
+
+        def frame(t: float) -> None:
+            self._press_offset = anim.lerp(start, target, t)
+            self._draw()
+
+        anim.animate(self, 90, frame, on_done=lambda: setattr(self, "_press_offset", target))
 
     # -- 事件 ------------------------------------------------------------
 
@@ -322,18 +382,22 @@ class RoundedButton(tk.Canvas):
 
     def _on_leave(self, _event: tk.Event) -> None:
         self._hover = False
-        self._pressed = False
+        if self._pressed:
+            self._pressed = False
+            self._animate_press(False)
         self._refresh()
 
     def _on_press(self, _event: tk.Event) -> None:
         if not self._enabled:
             return
         self._pressed = True
+        self._animate_press(True)
         self._refresh()
 
     def _on_release(self, _event: tk.Event) -> None:
         was_pressed = self._pressed
         self._pressed = False
+        self._animate_press(False)
         self._refresh()
         if self._enabled and was_pressed:
             self._command()
@@ -428,6 +492,83 @@ class IndexBadge(tk.Canvas):
             fill=theme.ACCENT,
             font=self._font,
         )
+
+
+class Spinner(tk.Canvas):
+    """转圈的三段弧。用在「正在请求模型」这种没有确定进度的地方。
+
+    四段弧、透明度递减、每帧旋转 12°，看起来就像在转。
+    系统关掉动画时画一个静止的弧，仍然能表达「在忙」。
+    """
+
+    def __init__(
+        self,
+        master: tk.Misc,
+        size: Optional[int] = None,
+        color: str = theme.ACCENT,
+        background: str = theme.SURFACE,
+        thickness: int = 2,
+    ) -> None:
+        self._size = size if size is not None else theme.px(18)
+        super().__init__(
+            master,
+            width=self._size,
+            height=self._size,
+            background=background,
+            highlightthickness=0,
+            bd=0,
+        )
+        self._color = color
+        self._thickness = max(1, theme.px(thickness))
+        self._angle = 0.0
+        self._running = False
+        self.bind("<Configure>", lambda _e: self._draw())
+        self._draw()
+
+    def start(self) -> None:
+        if self._running:
+            return
+        self._running = True
+        # 系统关掉动画时画一个静止的弧就够了：仍然能表达「在忙」，
+        # 又不会给晕动症用户添麻烦。
+        self._draw()
+        if anim.reduce_motion():
+            return
+        self._tick()
+
+    def _tick(self) -> None:
+        if not self._running or not self.winfo_exists():
+            return
+        self._angle = (self._angle + 12.0) % 360.0
+        self._draw()
+        self.after(anim.FRAME_MS, self._tick)
+
+    def stop(self) -> None:
+        self._running = False
+
+    def _draw(self) -> None:
+        self.delete("all")
+        size = self.winfo_width() or self._size
+        if size <= 1:
+            return
+        inset = self._thickness / 2 + 1
+        box = (inset, inset, size - inset, size - inset)
+
+        # 底圈
+        self.create_oval(*box, outline=theme.BORDER, width=self._thickness)
+        # 四段短弧，透明度递减，构成「拖尾」
+        for index in range(4):
+            extent = 22
+            start = self._angle + index * 26
+            shade = anim.lerp_color(theme.BORDER, self._color, 1.0 - index * 0.22)
+            self.create_arc(
+                *box,
+                start=start,
+                extent=extent,
+                style="arc",
+                outline=shade,
+                width=self._thickness,
+            )
 
 
 class Divider(tk.Frame):

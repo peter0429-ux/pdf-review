@@ -22,7 +22,7 @@ from core import settings as settings_mod
 from core.cards import AnalysisDocument
 from core.project import DeckEntry, DeckStore
 
-from . import dpi, theme
+from . import anim, dpi, theme
 from .analyze_dialog import AnalyzeDialog
 from .deck_list import DeckList
 from .preview import CardPreview
@@ -214,9 +214,33 @@ class MainWindow(tk.Frame):
     def _sync_status(self, count: int) -> None:
         self._footer.configure(text=f"共 {count} 个牌组  ·  存放位置：{self._store.root}")
         if not self._settings.is_configured:
-            self._status.configure(text="还没配置 AI 接口 — 点右上角「设置」", foreground=theme.WARN)
+            self._set_status("还没配置 AI 接口 — 点右上角「设置」", theme.WARN)
         else:
-            self._status.configure(text=f"{self._settings.model}", foreground=theme.MUTED)
+            self._set_status(self._settings.model, theme.MUTED)
+
+    def _set_status(self, text: str, color: str) -> None:
+        """更新顶栏那行小字，并让颜色从浅蓝「落」到目标色。
+
+        这行字在配好接口、切牌组时会变。直接改文字会让人怀疑是不是自己
+        眼花——颜色先亮一下再落定，变化才有落点。
+        """
+        changed = self._status.cget("text") != text
+        self._status.configure(text=text)
+        if not changed:
+            self._status.configure(foreground=color)
+            return
+        if anim.reduce_motion():
+            self._status.configure(foreground=color)
+            return
+
+        start = theme.ACCENT
+
+        def frame(t: float) -> None:
+            if not self._status.winfo_exists():
+                return
+            self._status.configure(foreground=anim.lerp_color(start, color, t))
+
+        anim.animate(self._status, 420, frame, on_done=lambda: self._status.configure(foreground=color))
 
     # -- 事件 ------------------------------------------------------------
 

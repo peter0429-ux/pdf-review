@@ -11,6 +11,9 @@
 
 默认位置：`%USERPROFILE%\\Documents\\PdfReviewPC\\decks\\`。
 放「文档」而不是 `%APPDATA%`，是因为用户会想自己去文件夹里找导出的 JSON。
+
+便携模式（exe 旁边有 `portable.txt`，或设了 `PDFREVIEW_HOME`）下改成
+程序目录里的 `decks\\`，整个文件夹可以拷走。
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ from typing import Iterator, Optional
 
 from . import cards as cards_mod
 from .cards import AnalysisDocument
+from .settings import portable_dir
 
 #: 牌组主文件的固定名字。刻意用带 `.pdfreview.json` 的名字，
 #: 这样用户在资源管理器里一眼能认出来「这就是要传到手机上的那个文件」。
@@ -37,11 +41,16 @@ META_FILE_NAME = "meta.json"
 
 
 def default_workspace() -> Path:
-    """`%USERPROFILE%\\Documents\\PdfReviewPC`。
+    """牌组库的根目录。
+
+    便携模式用程序目录（跟着 exe 走），否则 `%USERPROFILE%\\Documents\\PdfReviewPC`。
 
     只算路径不建目录——理由同 `settings.app_data_dir()`：读列表时目录不存在
     本来就该得到空列表，不该把程序拦在启动画面之外。
     """
+    portable = portable_dir()
+    if portable is not None:
+        return portable
     home = Path(os.environ.get("USERPROFILE") or Path.home())
     return home / "Documents" / "PdfReviewPC"
 
