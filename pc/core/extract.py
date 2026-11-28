@@ -106,10 +106,15 @@ def extract(path: Path | str) -> Extraction:
     size = target.stat().st_size
     if size == 0:
         raise ExtractError(f"文件是空的（0 字节）：{target.name}")
-    if size > limits.MAX_FILE_BYTES:
+    # 拦的是源文档，用 MAX_SOURCE_BYTES 而不是 MAX_FILE_BYTES：
+    # 后者是导出 JSON 的上限（8 MB），拿它卡源文件会让一份 79 页、
+    # 文字层完整、只是图片多的讲义（74 MB）完全进不来。
+    if size > limits.MAX_SOURCE_BYTES:
         raise ExtractError(
-            f"文件 {size / 1024 / 1024:.1f} MB，超过 {limits.MAX_FILE_BYTES // 1024 // 1024} MB 上限。"
-            "太大的文档切成几份再导入，或者先用别的工具压缩一下图片。"
+            f"文件 {size / 1024 / 1024:.1f} MB，超过 "
+            f"{limits.MAX_SOURCE_BYTES // 1024 // 1024} MB 上限。"
+            "如果这份文档主要是图片（扫描件），即使放开体积也读不出文字；"
+            "如果是正常排版的 PDF，可以先用别的工具压缩掉图片再试。"
         )
 
     suffix = target.suffix.lower()

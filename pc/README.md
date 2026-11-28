@@ -21,7 +21,12 @@ iOS 版分析一份 PDF 要花几分钟，而且必须一直开着 App。文档�
 | `.txt` / `.md` | 纯文本；Markdown 按 `#` 标题分节 |
 | `.html` / `.htm` | 去掉脚本、导航、页眉页脚后取正文 |
 
-单份文件上限 8 MB——和 iOS 版同一个限制，超了就导不过去。
+单份源文档上限 300 MB。**这个上限只管"能不能读进来"**：体积几乎全在内嵌图片上，
+真正送给模型的只有文字层，所以一份七十多 MB 的讲义通常只抽出两三万字。
+真正的瓶颈是文字量——文字太多会切成很多块、请求很多次，选完文件后对话框会给出
+预估的块数与耗时。
+
+（导出/导入的 `.pdfreview.json` 另有 8 MB 上限，那是交换文件，和源文档不是一回事。）
 
 ## 怎么用
 
@@ -132,7 +137,12 @@ pc/
 ## 和 iOS 版的一致性
 
 两边的上限常量必须一样：题目 500 字、答案 2000、补充说明 2000、标签最多 8 个、
-单个标签 32 字、卡片最多 500 张、标题 200 字、单文件 8 MB、格式版本 `1.0`。
+单个标签 32 字、卡片最多 500 张、标题 200 字、格式版本 `1.0`。
+
+体积上限有两套，**不要合并**：`.pdfreview.json` 交换文件 8 MB（两端一致，iOS 的
+`AnalysisDocument.maxFileBytes` 与 PC 的 `limits.MAX_FILE_BYTES` 对应）；源文档
+300 MB 只有 PC 版有（`limits.MAX_SOURCE_BYTES`），因为 iOS 版选 PDF 时本来就不设
+体积限制。`check_format_consistency.py` 会断言这两个数都存在且不相等。
 
 `scripts/check_format_consistency.py`（在仓库根目录的 `scripts/` 下）会读
 `pc/core/limits.py`、iOS 的 `AnalysisDocument.swift`、`schema/analysis.v1.schema.json`

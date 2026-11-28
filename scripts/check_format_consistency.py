@@ -227,6 +227,7 @@ def pc_limits(src: str) -> dict[str, object]:
         out["supportedVersion"] = version.group(1)
 
     # MAX_FILE_BYTES = 8 * 1024 * 1024
+    # 这是**分析文件**（.pdfreview.json）的上限，与 Swift 的 maxFileBytes 同义。
     size = re.search(
         r"^MAX_FILE_BYTES\s*=\s*(\d+)\s*\*\s*(\d+)\s*\*\s*(\d+)", src, re.MULTILINE
     )
@@ -236,6 +237,22 @@ def pc_limits(src: str) -> dict[str, object]:
         size = re.search(r"^MAX_FILE_BYTES\s*=\s*(\d+)\s*$", src, re.MULTILINE)
         if size:
             out["maxFileBytes"] = int(size.group(1))
+
+    # MAX_SOURCE_BYTES = 300 * 1024 * 1024
+    # 这是**源文档**（用户选的 PDF / Office 文件）的上限，与 iOS 没有对应项
+    # （iOS 侧对源 PDF 不设体积限制）。所以它不参与「两端一致」的比对，
+    # 只在这里单独取出，供下面那条「两个上限不能混用」的断言使用。
+    source = re.search(
+        r"^MAX_SOURCE_BYTES\s*=\s*(\d+)\s*\*\s*(\d+)\s*\*\s*(\d+)", src, re.MULTILINE
+    )
+    if source:
+        out["maxSourceBytes"] = (
+            int(source.group(1)) * int(source.group(2)) * int(source.group(3))
+        )
+    else:
+        source = re.search(r"^MAX_SOURCE_BYTES\s*=\s*(\d+)\s*$", src, re.MULTILINE)
+        if source:
+            out["maxSourceBytes"] = int(source.group(1))
 
     return out
 
@@ -355,6 +372,27 @@ def main() -> int:
             )
         else:
             notes.append(f"格式版本号两端一致：{pc_version!r}")
+
+        # 两个「体积上限」必须都在，而且不能是同一个数。
+        # 历史上它们共用过 MAX_FILE_BYTES，结果一份 74 MB 但文字层完整的
+        # 讲义被 8 MB 的导出上限拦在门外——同名不同义是这类 bug 的温床。
+        file_bytes = pc.get("maxFileBytes")
+        source_bytes = pc.get("maxSourceBytes")
+        if source_bytes is None:
+            problems.append(
+                "PC 版 limits.py 里找不到 MAX_SOURCE_BYTES（源文档体积上限）。"
+                "源文档与导出文件是两回事，不能共用 MAX_FILE_BYTES。"
+            )
+        elif file_bytes is not None and source_bytes == file_bytes:
+            problems.append(
+                f"MAX_SOURCE_BYTES 与 MAX_FILE_BYTES 相等（都是 {file_bytes}）："
+                "前者是用户选的源文档上限，后者是导出 JSON 的上限，不该是同一个数。"
+            )
+        else:
+            notes.append(
+                f"源文档上限 {source_bytes // (1024 * 1024)} MB"
+                f"（导出上限仍是 {file_bytes // (1024 * 1024)} MB，两者独立）"
+            )
 
     # ---- 4. schema 的 additionalProperties:false 必须与 KnownKeys 对得上 ----
     known = swift_known_keys(swift)

@@ -300,9 +300,20 @@ class AnalyzeDialog(tk.Toplevel):
             return
 
         estimate = analyzer.estimate_total_cards(extraction, self._settings.cards_per_chunk)
+        chunk_count, _, seconds = analyzer.estimate_workload(
+            extraction, self._settings.cards_per_chunk
+        )
+        # 小块（1–2 块）不提时间：那种几十秒就完了，说「约 40 秒」反而显得慢。
+        # 大块才提醒，因为用户会盯着进度条怀疑是不是卡住了。
+        duration_hint = ""
+        if chunk_count >= 3:
+            minutes = max(1, round(seconds / 60))
+            duration_hint = f"要请求 {chunk_count} 次，大约 {minutes} 分钟。"
         self._hint.set(
-            f"读到 {extraction.page_count} {extraction.unit_label}、约 {extraction.char_count} 字，"
-            f"会切成若干块；按每块 {self._settings.cards_per_chunk} 张算，最多约 {estimate} 张卡片。"
+            f"读到 {extraction.page_count} {extraction.unit_label}、"
+            f"约 {extraction.char_count} 字，"
+            f"按每块 {self._settings.cards_per_chunk} 张算，最多约 {estimate} 张卡片。"
+            + (f"{duration_hint}分析期间请让这个窗口开着。" if duration_hint else "")
         )
 
     # -- 分析 ------------------------------------------------------------

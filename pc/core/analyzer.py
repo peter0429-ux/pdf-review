@@ -223,3 +223,21 @@ def estimate_total_cards(extraction: Extraction, cards_per_chunk: int) -> int:
     """
     chunks = chunk_extraction(extraction)
     return estimate_cards(len(chunks), max(1, min(cards_per_chunk, 12)))
+
+
+def estimate_workload(
+    extraction: Extraction, cards_per_chunk: int
+) -> tuple[int, int, int]:
+    """返回 `(块数, 最多卡片数, 预计秒数)`，给「开始分析」前的提示用。
+
+    为什么要报秒数：大文档会切成几十块，每块一次请求、几秒到几十秒。
+    用户看到「最多约 180 张卡片」并不知道这意味着要等二十分钟，还以为是
+    卡死了。给个数量级，他就能决定现在做还是晚点做。
+
+    按每块 20 秒估：实测 DeepSeek 出 6 张卡（含解析）大约十几到三十秒，
+    取中间值。这只是量级参考，不写进任何校验。
+    """
+    per_chunk = max(1, min(cards_per_chunk, 12))
+    chunks = chunk_extraction(extraction)
+    seconds = len(chunks) * 20
+    return len(chunks), estimate_cards(len(chunks), per_chunk), seconds

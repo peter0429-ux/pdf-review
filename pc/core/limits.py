@@ -49,8 +49,26 @@ SUMMARY_MAX = 2000
 #: generator 字段上限
 GENERATOR_MAX = 128
 
-#: 单文件体积上限（8 MB），与 iOS 的 `AnalysisDocument.maxFileBytes` 一致
+#: 导入分析文件（`.pdfreview.json`）的体积上限：8 MB。
+#:
+#: 注意它管的是**分析结果**，不是源文档。这个数字与 iOS 的
+#: `AnalysisDocument.maxFileBytes` 一一对应，两边必须一致——它是跨端
+#: 交接的格式约束，改了两端就互相打不开。
 MAX_FILE_BYTES = 8 * 1024 * 1024
+
+#: 源文档（PDF / Office / 文本）的体积上限：300 MB。
+#:
+#: 与上面的 `MAX_FILE_BYTES` **不是同一个东西**，别再合并：
+#: - `MAX_FILE_BYTES` 约束的是导出的 JSON 有多大（文字量决定的）
+#: - 这里约束的是用户选的原始文件有多大（图片/嵌入字体决定的）
+#:
+#: 一份 79 页的图文讲义可以到 74 MB，但抽出来的文字只有 2 万多字。
+#: 图片根本不会被读取，按体积拦它属于拦错了对象。真正决定分析成本
+#: 的是文本量，那是 `CHUNK_MAX_CHARS` 与 `CARDS_MAX` 的事。
+#:
+#: 300 MB 只用来防「手滑选了个几百兆的扫描件」：那种文件抽不出字，
+#: 会走到「没有文字层」的分支，但先得花时间读完才判得出来。
+MAX_SOURCE_BYTES = 300 * 1024 * 1024
 
 #: 支持的格式版本
 SUPPORTED_VERSION = "1.0"
